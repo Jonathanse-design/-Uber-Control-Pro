@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2563EB">
+  <meta name="theme-color" content="#0A2E4A">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Uber Control Pro">
@@ -11,9 +11,14 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=13">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=16">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
-  <script src="app.js?v=13" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="historical-data.js?v=16" defer></script>
+  <script src="app.js?v=16" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -26,14 +31,14 @@
         </div>
       </div>
       <nav class="nav" aria-label="Principal">
-        <button class="nav-item active" data-view="dashboard"><span>⌁</span>Dashboard</button>
-        <button class="nav-item" data-view="registro"><span>＋</span>Registro Diario</button>
-        <button class="nav-item" data-view="historial"><span>≡</span>Historial</button>
-        <button class="nav-item" data-view="reportes"><span>▥</span>Reportes</button>
-        <button class="nav-item" data-view="metas"><span>◎</span>Metas</button>
-        <button class="nav-item" data-view="kia"><span>◇</span>Kia K5</button>
-        <button class="nav-item" data-view="respaldo"><span>⇅</span>Respaldo</button>
-        <button class="nav-item" data-view="config"><span>⚙</span>Configuración</button>
+        <button class="nav-item active" data-view="dashboard"><span class="material-symbols-rounded">space_dashboard</span>Dashboard</button>
+        <button class="nav-item" data-view="registro"><span class="material-symbols-rounded">add_circle</span>Registro Diario</button>
+        <button class="nav-item" data-view="historial"><span class="material-symbols-rounded">history</span>Historial</button>
+        <button class="nav-item" data-view="reportes"><span class="material-symbols-rounded">analytics</span>Reportes</button>
+        <button class="nav-item" data-view="metas"><span class="material-symbols-rounded">flag</span>Metas</button>
+        <button class="nav-item" data-view="kia"><span class="material-symbols-rounded">directions_car</span>Kia K5</button>
+        <button class="nav-item" data-view="respaldo"><span class="material-symbols-rounded">cloud_sync</span>Respaldo</button>
+        <button class="nav-item" data-view="config"><span class="material-symbols-rounded">settings</span>Configuración</button>
       </nav>
       <div class="sidebar-foot">
         <span class="status-dot"></span>
@@ -56,6 +61,7 @@
           <button type="button" data-period="week" class="active">Semana</button>
           <button type="button" data-period="month">Mes</button>
           <button type="button" data-period="year">Año</button>
+          <button type="button" data-period="all">Todo</button>
         </div>
         <div class="quick-actions">
           <button class="quick-button" id="topExport" type="button" aria-label="Exportar CSV">
@@ -65,7 +71,7 @@
           <label class="quick-button file-button" aria-label="Importar respaldo">
             <span class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg></span>
             Importar
-            <input id="importFile" type="file" accept=".csv,.json">
+            <input id="importFile" type="file" accept=".csv,.json,.xls,.xlsx">
           </label>
           <button class="quick-button" id="topBackup" type="button" aria-label="Crear respaldo">
             <span class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 3v6h-6"/><path d="M21 9 15 3"/><path d="M9 12h6"/></svg></span>

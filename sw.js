@@ -1,12 +1,14 @@
-const CACHE_NAME = "uber-control-pro-v13";
+const CACHE_NAME = "uber-control-pro-v16";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=13",
-  "./app.js?v=13",
+  "./style.css?v=16",
+  "./historical-data.js?v=16",
+  "./app.js?v=16",
   "./manifest.json",
   "./icons/icon.svg",
-  "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+  "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+  "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];
 
 self.addEventListener("install", event => {

@@ -1,16 +1,4 @@
-const starterEntries = [
-  { fecha: "2026-05-26", ingresos: 821.62, combustible: 960.4, otros_gastos: 6579, tipo_gasto: "Merienda / Mantenimiento", viajes: 4, km_inicio: 8500, km_final: 8460, notas: "Importado desde hoja Combustible km.xlsx", horas: 6 },
-  { fecha: "2026-05-27", ingresos: 2265.58, combustible: 0, otros_gastos: 200, tipo_gasto: "Merienda", viajes: 8, km_inicio: 8456, km_final: 8377, notas: "Importado desde hoja Combustible km.xlsx", horas: 8 },
-  { fecha: "2026-05-28", ingresos: 2752.49, combustible: 1898.85, otros_gastos: 1576.86, tipo_gasto: "Merienda / internet", viajes: 12, km_inicio: 8377, km_final: 8251, notas: "Importado desde hoja Combustible km.xlsx", horas: 9 },
-  { fecha: "2026-05-29", ingresos: 4269, combustible: 0, otros_gastos: 150, tipo_gasto: "Merienda", viajes: 15, km_inicio: 8251, km_final: 8107, notas: "Importado desde hoja Combustible km.xlsx", horas: 10 },
-  { fecha: "2026-05-30", ingresos: 2281, combustible: 1000, otros_gastos: 4200, tipo_gasto: "Merienda y frenos", viajes: 9, km_inicio: 8107, km_final: 7977, notas: "Importado desde hoja Combustible km.xlsx", horas: 8 },
-  { fecha: "2026-05-31", ingresos: 3448, combustible: 0, otros_gastos: 0, tipo_gasto: "", viajes: 12, km_inicio: 7977, km_final: 7838, notas: "Importado desde hoja Combustible km.xlsx", horas: 9 },
-  { fecha: "2026-06-01", ingresos: 3292, combustible: 1800, otros_gastos: 100, tipo_gasto: "Merienda", viajes: 11, km_inicio: 7838, km_final: 7691, notas: "Importado desde hoja Combustible km.xlsx", horas: 9 },
-  { fecha: "2026-06-02", ingresos: 2174, combustible: 0, otros_gastos: 580, tipo_gasto: "Lavado y merienda", viajes: 8, km_inicio: 7691, km_final: 7562, notas: "Importado desde hoja Combustible km.xlsx", horas: 7 },
-  { fecha: "2026-06-03", ingresos: 1724, combustible: 1881, otros_gastos: 4767, tipo_gasto: "Merienda y otros", viajes: 8, km_inicio: 7562, km_final: 7438, notas: "Importado desde hoja Combustible km.xlsx", horas: 8 },
-  { fecha: "2026-06-04", ingresos: 0, combustible: 0, otros_gastos: 650, tipo_gasto: "Merienda", viajes: 0, km_inicio: 7438, km_final: 7398, notas: "No se trabajo Uber salí con las niñas de paseo", horas: 0 },
-  { fecha: "2026-06-05", ingresos: 2147, combustible: 0, otros_gastos: 1100, tipo_gasto: "Mami y merienda", viajes: 7, km_inicio: 7398, km_final: 7296, notas: "Día flojo", horas: 7 }
-];
+const starterEntries = Array.isArray(window.HISTORICAL_UBER_CONTROL_2026) ? window.HISTORICAL_UBER_CONTROL_2026 : [];
 
 const defaultSettings = {
   reserveRate: 8,
@@ -21,7 +9,7 @@ const defaultSettings = {
   annualGoal: 1140000
 };
 
-let entries = load("ucp_entries", starterEntries);
+let entries = initializeEntries();
 let settings = load("ucp_settings", defaultSettings);
 let charts = {};
 
@@ -46,27 +34,150 @@ function load(key, fallback) {
 }
 
 function save() {
+  entries = mergeEntries(entries);
   localStorage.setItem("ucp_entries", JSON.stringify(entries));
   localStorage.setItem("ucp_settings", JSON.stringify(settings));
 }
 
+function initializeEntries() {
+  const saved = load("ucp_entries", []);
+  const merged = mergeEntries(starterEntries, saved);
+  localStorage.setItem("ucp_entries", JSON.stringify(merged));
+  return merged;
+}
+
+function sourcePriority(source) {
+  return ({ combustible_km: 5, manual: 4, imported_excel: 3, imported_csv: 3, existing_local: 2, uber_ingresos_2026: 1 })[source] || 2;
+}
+
+function mergeEntries(...groups) {
+  const byDate = new Map();
+  groups.flat().filter(Boolean).map(normalizeEntry).filter(entry => entry.fecha).forEach(entry => {
+    const current = byDate.get(entry.fecha);
+    if (!current || sourcePriority(entry.source) >= sourcePriority(current.source)) byDate.set(entry.fecha, entry);
+  });
+  return [...byDate.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+function normalizeEntry(entry, source = entry?.source || "existing_local") {
+  const income = readNumber(entry.income, entry.INGRESOS, entry.ingresos);
+  const fuel = readNumber(entry.fuel, entry.GAS, entry.combustible);
+  const expenses = readNumber(entry.expenses, entry.GASTO, entry.GASTOS, entry.gasto, entry.gastos, entry.otros_gastos);
+  const kmStart = readNumber(entry.kmStart, entry["KM INICIO"], entry.km_inicio);
+  const kmEnd = readNumber(entry.kmEnd, entry["KM FINAL"], entry.km_final);
+  const providedKm = readNumber(entry.totalKm, entry["TOTAL KM"], entry[" TOTAL KM"]);
+  const totalKm = providedKm || (hasValue(kmStart) && hasValue(kmEnd) ? Math.abs(kmEnd - kmStart) : 0);
+  const providedProfit = firstValue(entry.netProfit, entry.GANANCIAS, entry["GANANCIAS "], entry.ganancias);
+  const netProfit = hasValue(providedProfit) ? readNumber(providedProfit) : income - fuel - expenses;
+  const normalizedSource = source || entry.source || "existing_local";
+  return {
+    fecha: normalizeDate(entry.fecha || entry.FECHA || entry.date),
+    fuel,
+    income,
+    expenses,
+    expenseType: cleanText(entry.expenseType ?? entry["TIPO GASTO"] ?? entry.tipo_gasto),
+    trips: readNumber(entry.trips, entry.VIAJES, entry.viajes),
+    kmStart,
+    kmEnd,
+    totalKm,
+    pricePerKm: readNumber(entry.pricePerKm, entry["PRECIO KM"], totalKm ? income / totalKm : 0),
+    netProfit,
+    source: normalizedSource,
+    notes: cleanText(entry.notes ?? entry.notas),
+    hours: readNumber(entry.hours, entry.horas)
+  };
+}
+
+function firstValue(...values) {
+  return values.find(hasValue);
+}
+
+function hasValue(value) {
+  return value !== undefined && value !== null && value !== "" && !Number.isNaN(value);
+}
+
+function readNumber(...values) {
+  const value = firstValue(...values);
+  if (!hasValue(value)) return 0;
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  const parsed = Number(String(value).replace(/,/g, "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function cleanText(value) {
+  if (!hasValue(value)) return "";
+  const text = String(value).trim();
+  return text.toLowerCase() === "none" ? "" : text;
+}
+
+function normalizeDate(value) {
+  if (!hasValue(value)) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+  if (typeof value === "number") {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
+    return excelEpoch.toISOString().slice(0, 10);
+  }
+  const raw = String(value).trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, " ");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const withoutDay = raw.includes(",") ? raw.split(",").slice(1).join(",").trim() : raw;
+  const months = { ene: 0, enero: 0, feb: 1, febrero: 1, mar: 2, marzo: 2, abr: 3, abril: 3, may: 4, mayo: 4, jun: 5, junio: 5, jul: 6, julio: 6, ago: 7, agosto: 7, sep: 8, sept: 8, septiembre: 8, oct: 9, octubre: 9, nov: 10, noviembre: 10, dic: 11, diciembre: 11 };
+  const parts = withoutDay.split(" ");
+  if (parts.length >= 3) {
+    const day = Number(parts[0]);
+    const month = months[parts[1]] ?? months[parts[1]?.slice(0, 3)];
+    const year = Number(parts[2]);
+    if (day && month !== undefined && year) return new Date(Date.UTC(year, month, day)).toISOString().slice(0, 10);
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+}
+
 function km(entry) {
-  return Math.abs(Number(entry.km_final || 0) - Number(entry.km_inicio || 0));
+  return Number(entry.totalKm || 0) || (hasValue(entry.kmStart) && hasValue(entry.kmEnd) ? Math.abs(Number(entry.kmEnd) - Number(entry.kmStart)) : 0);
 }
 
 function enrich(entry) {
-  const ingresos = Number(entry.ingresos || 0) + Number(entry.propinas || 0) + Number(entry.bonos || 0);
-  const gastos = Number(entry.combustible || 0) + Number(entry.comida || 0) + Number(entry.peajes || 0) + Number(entry.otros_gastos || 0);
-  const distance = km(entry);
+  const normalized = normalizeEntry(entry);
+  const ingresos = Number(normalized.income || 0) + Number(entry.propinas || 0) + Number(entry.bonos || 0);
+  const combustible = Number(normalized.fuel || 0);
+  const otrosGastos = Number(normalized.expenses || 0) + Number(entry.comida || 0) + Number(entry.peajes || 0);
+  const gastos = combustible + otrosGastos;
+  const distance = km(normalized);
   const reserve = distance * Number(settings.reserveRate || 0);
   const depreciation = distance * Number(settings.depreciationRate || 0);
-  const operating = ingresos - gastos;
+  const operating = hasValue(normalized.netProfit) ? Number(normalized.netProfit) : ingresos - gastos;
   const real = operating - reserve - depreciation;
-  return { ...entry, ingresos, gastos, km: distance, reserve, depreciation, operating, real };
+  return {
+    ...normalized,
+    ingresos,
+    income: ingresos,
+    combustible,
+    fuel: combustible,
+    otros_gastos: otrosGastos,
+    expenses: otrosGastos,
+    gastos,
+    viajes: Number(normalized.trips || 0),
+    trips: Number(normalized.trips || 0),
+    horas: Number(normalized.hours || 0),
+    hours: Number(normalized.hours || 0),
+    tipo_gasto: normalized.expenseType,
+    notas: normalized.notes,
+    km_inicio: normalized.kmStart,
+    km_final: normalized.kmEnd,
+    km: distance,
+    totalKm: distance,
+    reserve,
+    depreciation,
+    operating,
+    netProfit: operating,
+    real
+  };
 }
 
 function rangeEntries(period) {
   const enriched = entries.map(enrich).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  if (period === "all") return enriched;
   const latest = enriched.at(-1)?.fecha || "2026-06-05";
   const latestDate = new Date(`${latest}T12:00:00`);
   const days = { day: 1, week: 7, month: 31, year: 366 }[period] || 7;
@@ -136,7 +247,7 @@ function renderKpis(total) {
     ["Reserva", total.reserve, "wrench", "up"]
   ];
   document.getElementById("primaryKpis").innerHTML = primary.map(([label, value, icon, trend, kind]) => `
-    <article class="kpi-card primary-kpi">
+    <article class="kpi-card primary-kpi ${trend} ${icon}">
       <div class="kpi-top"><span>${label}</span><span class="kpi-icon">${iconSvg(icon)}</span></div>
       <div>
         <div class="kpi-value">${formatByKind(value, kind)}</div>
@@ -154,19 +265,19 @@ function renderKpis(total) {
 
 function iconSvg(name) {
   const icons = {
-    cash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="6" width="18" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9v.01M18 15v.01"/></svg>',
-    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 3v4M16 3v4"/><rect x="4" y="5" width="16" height="17" rx="2"/><path d="M4 10h16M8 14h.01M12 14h.01M16 14h.01"/></svg>',
-    wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h15a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h13"/><path d="M16 13h.01"/></svg>',
-    profit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 18 10 12l4 4 6-9"/><path d="M15 7h5v5"/></svg>',
-    fuel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 21V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"/><path d="M4 21h13M8 7h5M16 8h1a3 3 0 0 1 3 3v7a2 2 0 0 0 2 2"/></svg>',
-    route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h4a4 4 0 0 0 0-8h-1a4 4 0 0 1 0-8h5"/></svg>',
-    car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 13 7 7h10l2 6"/><path d="M4 13h16v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2H9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-5Z"/><path d="M7 15h.01M17 15h.01"/></svg>',
-    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-    gauge: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 16a8 8 0 0 1 16 0"/><path d="m12 16 4-5"/><path d="M6 16h12"/></svg>',
-    roi: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 19V5"/><path d="M4 19h16"/><path d="m7 15 4-4 3 3 6-8"/></svg>',
-    wrench: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 7a4 4 0 0 0 5 5L10 21l-5-5 9-9Z"/><path d="m7 17 3 3"/></svg>'
+    cash: "payments",
+    calendar: "calendar_month",
+    wallet: "account_balance_wallet",
+    profit: "monitoring",
+    fuel: "local_gas_station",
+    route: "route",
+    car: "directions_car",
+    clock: "schedule",
+    gauge: "speed",
+    roi: "trending_up",
+    wrench: "build"
   };
-  return icons[name] || icons.profit;
+  return `<span class="material-symbols-rounded">${icons[name] || icons.profit}</span>`;
 }
 
 function todayTotal(key) {
@@ -187,13 +298,14 @@ function renderCharts(data) {
   const primary = css.getPropertyValue("--primary").trim();
   const success = css.getPropertyValue("--success").trim();
   const danger = css.getPropertyValue("--danger").trim();
+  const warning = css.getPropertyValue("--warning").trim();
   const muted = css.getPropertyValue("--muted").trim();
   drawChart("profitChart", {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: primary, backgroundColor: "rgba(37,99,235,.18)", tension: .45, fill: true, pointRadius: 3, pointHoverRadius: 5 }
+        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: success, backgroundColor: "rgba(166,245,192,.22)", tension: .45, fill: true, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: success }
       ]
     },
     options: chartOptions(muted)
@@ -203,8 +315,9 @@ function renderCharts(data) {
     data: {
       labels,
       datasets: [
-        { label: "Ingresos", data: data.map(entry => entry.ingresos), backgroundColor: "rgba(37,99,235,.72)", borderRadius: 10 },
-        { label: "Gastos", data: data.map(entry => entry.gastos), backgroundColor: "rgba(239,68,68,.58)", borderRadius: 10 }
+        { label: "Ingresos", data: data.map(entry => entry.ingresos), backgroundColor: success, borderRadius: 10 },
+        { label: "Gastos", data: data.map(entry => entry.gastos), backgroundColor: danger, borderRadius: 10 },
+        { label: "Combustible", data: data.map(entry => entry.combustible), backgroundColor: warning, borderRadius: 10 }
       ]
     },
     options: chartOptions(muted)
@@ -252,37 +365,26 @@ function renderGoals(all) {
 function goalRing(name, current, goal) {
   const value = Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
   const missing = Math.max(0, goal - current);
-  const projection = value >= 100 ? "Meta alcanzada" : `Faltan ${fmtMoney.format(missing)}`;
-  return `<article class="goal-ring-card">
+  const projection = value >= 100 ? "Meta alcanzada" : `Proyección: ${estimateGoalProjection(name, current, goal)}`;
+  const ringTone = current >= goal ? "positive" : current >= 0 ? "warning" : "negative";
+  return `<article class="goal-ring-card ${ringTone}">
     <div class="fitness-ring" style="--value:${value}%"><span>${value}%</span></div>
     <div>
       <h3>${name}</h3>
       <strong>${fmtMoney.format(current)}</strong>
       <p>${projection}</p>
+      <p>Faltante ${fmtMoney.format(missing)}</p>
     </div>
   </article>`;
 }
 
-function estimateEta(current) {
-  const juneDays = entries.filter(entry => entry.fecha.startsWith("2026-06")).length || 1;
-  const dailyAvg = current / juneDays;
-  if (dailyAvg <= 0) return "Sin proyección";
-  const remainingDays = Math.ceil(Math.max(0, settings.monthlyGoal - current) / dailyAvg);
-  const eta = new Date(today);
-  eta.setDate(eta.getDate() + remainingDays);
-  return eta.toLocaleDateString("es-DO", { day: "numeric", month: "short" });
-}
-
-function renderProfitStack(total) {
-  const rows = [
-    ["Ingresos", total.ingresos],
-    ["Gastos diarios", -total.gastos],
-    ["Ganancia operativa", total.operating],
-    ["Reserva mantenimiento", -total.reserve],
-    ["Depreciación vehículo", -total.depreciation],
-    ["Ganancia real", total.real]
-  ];
-  document.getElementById("profitStack").innerHTML = rows.map(([label, value]) => `<div class="profit-row"><span>${label}</span><strong>${fmtMoney.format(value)}</strong></div>`).join("");
+function estimateGoalProjection(name, current, goal) {
+  if (current >= goal) return "superada";
+  const periodDays = { Diaria: 1, Semanal: 7, Mensual: 30, Anual: 365 }[name] || 30;
+  const sampleDays = Math.max(1, Math.min(periodDays, entries.length));
+  const dailyPace = current / sampleDays;
+  if (dailyPace <= 0) return "requiere ajuste";
+  return fmtMoney.format(dailyPace * periodDays);
 }
 
 function renderReports(all) {
@@ -297,6 +399,10 @@ function renderReports(all) {
     const worst = [...data].sort((a, b) => a.real - b.real)[0];
     return `<article class="panel report-card">
       <h3>${label}</h3>
+      <div class="report-highlight ${total.real >= 0 ? "positive" : "negative"}">
+        <span>Ganancia real</span>
+        <strong>${fmtMoney.format(total.real)}</strong>
+      </div>
       ${reportRow("Ingresos", fmtMoney.format(total.ingresos))}
       ${reportRow("Gastos", fmtMoney.format(total.gastos))}
       ${reportRow("Combustible", fmtMoney.format(total.combustible))}
@@ -304,7 +410,6 @@ function renderReports(all) {
       ${reportRow("KM", `${fmtNum.format(total.km)} km`)}
       ${reportRow("Viajes", fmtNum.format(total.viajes))}
       ${reportRow("Ganancia operativa", fmtMoney.format(total.operating))}
-      ${reportRow("Ganancia real", fmtMoney.format(total.real))}
       ${reportRow("Mejor día", best ? `${best.fecha} · ${fmtMoney.format(best.real)}` : "-")}
       ${reportRow("Peor día", worst ? `${worst.fecha} · ${fmtMoney.format(worst.real)}` : "-")}
     </article>`;
@@ -316,7 +421,10 @@ function reportRow(label, value) {
 }
 
 function renderMaintenance(all) {
-  const currentKm = Math.min(...all.map(entry => Math.min(Number(entry.km_inicio), Number(entry.km_final))).filter(Boolean));
+  const knownOdometers = all
+    .flatMap(entry => [Number(entry.kmStart || entry.km_inicio || 0), Number(entry.kmEnd || entry.km_final || 0)])
+    .filter(value => value > 0);
+  const currentKm = knownOdometers.length ? Math.min(...knownOdometers) : 0;
   const items = [
     ["Aceite", 7200, 2500],
     ["Filtro aire motor", 6500, 1800],
@@ -341,7 +449,7 @@ function renderMaintenance(all) {
     <div class="vehicle-summary-row"><span>Costos futuros</span><strong>${fmtMoney.format(futureCost)}</strong></div>
   `;
   document.getElementById("maintenanceGrid").innerHTML = items.map(item => `
-    <article class="panel maintenance-card">
+    <article class="panel maintenance-card ${item.remaining <= 500 ? "critical" : item.remaining <= 1800 ? "warning" : "ok"}">
       <strong>${item.name}</strong>
       <p>${fmtNum.format(item.remaining)} km restantes</p>
       <div class="progress-bar" style="--value:${Math.max(6, Math.min(100, item.remaining / 30))}%"><span></span></div>
@@ -370,8 +478,7 @@ function renderDashboardVehicle(vehicle, total) {
 
 function renderHistory() {
   const query = (document.getElementById("historySearch")?.value || "").trim().toLowerCase();
-  const rows = entries
-    .map(enrich)
+  const rows = rangeEntries(getSelectedPeriod())
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .filter(entry => {
       const searchable = [entry.fecha, entry.tipo_gasto, entry.notas, entry.ingresos, entry.combustible, entry.otros_gastos].join(" ").toLowerCase();
@@ -505,19 +612,39 @@ function saveSettings() {
 }
 
 function exportCsv(data) {
-  const headers = ["fecha", "ingresos", "combustible", "otros_gastos", "tipo_gasto", "viajes", "km_inicio", "km_final", "notas", "horas"];
-  const csv = [headers.join(","), ...data.map(row => headers.map(key => `"${String(row[key] ?? "").replaceAll('"', '""')}"`).join(","))].join("\n");
+  const rows = data.map(enrich).map(toExportRow);
+  const headers = ["fecha", "fuel", "income", "expenses", "expenseType", "trips", "kmStart", "kmEnd", "totalKm", "pricePerKm", "netProfit", "source", "notes", "hours"];
+  const csv = [headers.join(","), ...rows.map(row => headers.map(key => `"${String(row[key] ?? "").replaceAll('"', '""')}"`).join(","))].join("\n");
   download("uber-control-pro.csv", "text/csv", csv);
 }
 
 function exportJson() {
-  download("uber-control-pro-backup.json", "application/json", JSON.stringify({ entries, settings }, null, 2));
+  download("uber-control-pro-backup.json", "application/json", JSON.stringify({ entries: entries.map(normalizeEntry), settings }, null, 2));
 }
 
 function exportExcel() {
-  const rows = entries.map(enrich);
+  const rows = entries.map(enrich).map(toExportRow);
   const table = `<table><tr>${Object.keys(rows[0]).map(key => `<th>${key}</th>`).join("")}</tr>${rows.map(row => `<tr>${Object.values(row).map(value => `<td>${value}</td>`).join("")}</tr>`).join("")}</table>`;
   download("uber-control-pro.xls", "application/vnd.ms-excel", table);
+}
+
+function toExportRow(entry) {
+  return {
+    fecha: entry.fecha,
+    fuel: entry.fuel,
+    income: entry.income,
+    expenses: entry.expenses,
+    expenseType: entry.expenseType,
+    trips: entry.trips,
+    kmStart: entry.kmStart,
+    kmEnd: entry.kmEnd,
+    totalKm: entry.totalKm,
+    pricePerKm: entry.pricePerKm,
+    netProfit: entry.netProfit,
+    source: entry.source,
+    notes: entry.notes,
+    hours: entry.hours
+  };
 }
 
 function download(filename, type, content) {
@@ -535,19 +662,24 @@ function importFile(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    const text = reader.result;
-    if (file.name.endsWith(".json")) {
+    const extension = file.name.split(".").pop().toLowerCase();
+    if (extension === "json") {
+      const text = reader.result;
       const backup = JSON.parse(text);
-      entries = backup.entries || entries;
+      entries = mergeEntries(entries, backup.entries || []);
       settings = backup.settings || settings;
+    } else if (extension === "xlsx" || extension === "xls") {
+      entries = mergeEntries(entries, parseWorkbook(reader.result));
     } else {
-      entries = parseCsv(text);
+      entries = mergeEntries(entries, parseCsv(reader.result));
     }
     save();
     hydrateSettings();
     renderAll();
+    event.target.value = "";
   };
-  reader.readAsText(file);
+  if (file.name.match(/\.(xlsx|xls)$/i)) reader.readAsArrayBuffer(file);
+  else reader.readAsText(file);
 }
 
 function parseCsv(text) {
@@ -555,8 +687,31 @@ function parseCsv(text) {
   const headers = splitCsvLine(headerLine).map(item => item.replaceAll('"', ""));
   return lines.filter(Boolean).map(line => {
     const cells = splitCsvLine(line);
-    return Object.fromEntries(headers.map((key, index) => [key, (cells[index] || "").replace(/^"|"$/g, "").replaceAll('""', '"')]));
+    const raw = Object.fromEntries(headers.map((key, index) => [key, (cells[index] || "").replace(/^"|"$/g, "").replaceAll('""', '"')]));
+    return normalizeEntry(raw, "imported_csv");
+  }).filter(entry => entry.fecha);
+}
+
+function parseWorkbook(buffer) {
+  if (!window.XLSX) {
+    alert("La librería de Excel no está disponible todavía. Abre la app con conexión una vez para activar importación XLSX offline.");
+    return [];
+  }
+  const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+  return workbook.SheetNames.flatMap(sheetName => {
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, defval: "" });
+    const headerIndex = rows.findIndex(row => row.map(cleanHeader).includes("FECHA"));
+    if (headerIndex < 0) return [];
+    const headers = rows[headerIndex].map(cleanHeader);
+    return rows.slice(headerIndex + 1).map(row => {
+      const raw = Object.fromEntries(headers.map((header, index) => [header, row[index]]));
+      return normalizeEntry(raw, "imported_excel");
+    }).filter(entry => entry.fecha);
   });
+}
+
+function cleanHeader(value) {
+  return String(value || "").trim().toUpperCase().replace(/\s+/g, " ");
 }
 
 function splitCsvLine(line) {
