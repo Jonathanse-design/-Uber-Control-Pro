@@ -19,6 +19,7 @@ const today = new Date("2026-06-05T12:00:00");
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  setDefaultEntryDate();
   hydrateSettings();
   bindEvents();
   renderAll();
@@ -47,14 +48,20 @@ function initializeEntries() {
 }
 
 function sourcePriority(source) {
-  return ({ combustible_km: 5, manual: 4, imported_excel: 3, imported_csv: 3, existing_local: 2, uber_ingresos_2026: 1 })[source] || 2;
+  return ({ manual: 6, combustible_km: 5, imported_excel: 3, imported_csv: 3, existing_local: 2, uber_ingresos_2026: 1 })[source] || 2;
+}
+
+function entryMergeKey(entry) {
+  if (entry.source === "manual" && entry.allowDuplicate && entry.id) return `manual:${entry.fecha}:${entry.id}`;
+  return entry.fecha;
 }
 
 function mergeEntries(...groups) {
   const byDate = new Map();
   groups.flat().filter(Boolean).map(normalizeEntry).filter(entry => entry.fecha).forEach(entry => {
-    const current = byDate.get(entry.fecha);
-    if (!current || sourcePriority(entry.source) >= sourcePriority(current.source)) byDate.set(entry.fecha, entry);
+    const key = entryMergeKey(entry);
+    const current = byDate.get(key);
+    if (!current || sourcePriority(entry.source) >= sourcePriority(current.source)) byDate.set(key, entry);
   });
   return [...byDate.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
 }
@@ -72,6 +79,8 @@ function normalizeEntry(entry, source = entry?.source || "existing_local") {
   const normalizedSource = source || entry.source || "existing_local";
   return {
     fecha: normalizeDate(entry.fecha || entry.FECHA || entry.date),
+    id: cleanText(entry.id),
+    allowDuplicate: Boolean(entry.allowDuplicate),
     fuel,
     income,
     expenses,
@@ -520,6 +529,18 @@ function formatDate(value) {
   return new Date(`${value}T12:00:00`).toLocaleDateString("es-DO", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function localDateValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function setDefaultEntryDate() {
+  const input = document.getElementById("entryDate");
+  if (input && !input.value) input.value = localDateValue();
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, char => ({
     "&": "&amp;",
@@ -593,9 +614,29 @@ function renderLiveResults(formData) {
 function saveEntry(event) {
   event.preventDefault();
   const data = Object.fromEntries(new FormData(event.currentTarget).entries());
-  entries.push({ ...data, fecha: new Date().toISOString().slice(0, 10), tipo_gasto: "Registro manual" });
+  const selectedDate = normalizeDate(data.fecha) || localDateValue();
+  const existingIndex = entries.findIndex(entry => normalizeDate(entry.fecha) === selectedDate);
+  const manualEntry = normalizeEntry({
+    ...data,
+    fecha: selectedDate,
+    tipo_gasto: "Registro manual",
+    source: "manual",
+    id: `manual-${selectedDate}-${Date.now()}`,
+    allowDuplicate: false
+  }, "manual");
+  if (existingIndex >= 0) {
+    const updateExisting = window.confirm("Ya existe un registro para esta fecha. ¿Deseas actualizarlo o crear uno nuevo?\n\nAceptar: actualizarlo.\nCancelar: crear uno nuevo.");
+    if (updateExisting) {
+      entries[existingIndex] = { ...manualEntry, id: entries[existingIndex].id || manualEntry.id, allowDuplicate: false };
+    } else {
+      entries.push({ ...manualEntry, allowDuplicate: true });
+    }
+  } else {
+    entries.push(manualEntry);
+  }
   save();
   event.currentTarget.reset();
+  setDefaultEntryDate();
   renderAll();
   switchView("dashboard");
 }
@@ -652,6 +693,8 @@ function toExportRow(entry) {
     pricePerKm: entry.pricePerKm,
     netProfit: entry.netProfit,
     source: entry.source,
+    id: entry.id,
+    allowDuplicate: entry.allowDuplicate,
     notes: entry.notes,
     hours: entry.hours
   };
