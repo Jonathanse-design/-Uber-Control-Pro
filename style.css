@@ -88,6 +88,36 @@ button, input, select, textarea {
 
 button { cursor: pointer; }
 
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding:
+    calc(2rem + var(--safe-top))
+    calc(2rem + var(--safe-right))
+    calc(2rem + var(--safe-bottom))
+    calc(2rem + var(--safe-left));
+  background:
+    radial-gradient(circle at 50% 42%, rgba(37, 99, 235, .18), transparent 28rem),
+    linear-gradient(135deg, #020617, #0F172A);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .32s ease, visibility .32s ease;
+}
+
+.splash-screen img {
+  width: min(72vw, 34rem);
+  height: auto;
+}
+
+body.app-ready .splash-screen {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .material-symbols-rounded {
   direction: ltr;
   display: inline-block;
@@ -156,10 +186,16 @@ button { cursor: pointer; }
   height: 2.35rem;
   flex: 0 0 2.35rem;
   border-radius: .85rem;
-  color: #fff;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--navy), var(--primary) 66%, var(--accent-cyan));
+  object-fit: contain;
+  background: var(--navy);
   box-shadow: 0 14px 32px color-mix(in srgb, var(--primary), transparent 72%);
+}
+
+.topbar-logo {
+  display: none;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: .85rem;
 }
 
 .nav {
@@ -946,9 +982,10 @@ textarea { resize: vertical; }
   }
   .sidebar.open { transform: none; }
   .menu-button { display: inline-grid; place-items: center; }
+  .topbar-logo { display: block; }
   .topbar {
     top: calc(.5rem + var(--safe-top));
-    grid-template-columns: 2.65rem minmax(0, 1fr) 2.75rem;
+    grid-template-columns: 2.65rem 2.35rem minmax(0, 1fr) 2.75rem;
     gap: .65rem;
     min-height: auto;
     padding:

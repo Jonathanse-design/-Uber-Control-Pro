@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 360" role="img" aria-label="Uber Control Pro">
+  <defs>
+  <linearGradient id="ucpGauge" x1="120" x2="880" y1="120" y2="900" gradientUnits="userSpaceOnUse">
+    <stop stop-color="#0D47FF"/>
+    <stop offset=".55" stop-color="#00C6FF"/>
+    <stop offset="1" stop-color="#00E676"/>
+  </linearGradient>
+  <linearGradient id="ucpSilver" x1="0" x2="0" y1="0" y2="1">
+    <stop stop-color="#FFFFFF"/>
+    <stop offset="1" stop-color="#D9E2EF"/>
+  </linearGradient>
+  <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="18" result="blur"/>
+    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.03 0 0 0 0 0.43 0 0 0 0 1 0 0 0 .55 0"/>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+  <g transform="translate(36 60) scale(.24)"><g filter="url(#softGlow)">
+  <path fill="url(#ucpGauge)" d="M184 594c0-177 143-320 320-320s320 143 320 320v36c0 31-25 56-56 56H656c-31 0-56-25-56-56v-36c0-53-43-96-96-96s-96 43-96 96v36c0 31-25 56-56 56H240c-31 0-56-25-56-56v-36Z"/>
+  <path fill="url(#ucpSilver)" d="M292 318c55-54 132-88 216-88 85 0 162 34 218 90l-92 93c-32-31-76-50-124-50-49 0-93 19-125 51l-93-96Z"/>
+  <circle cx="512" cy="594" r="78" fill="url(#ucpSilver)"/>
+  <path stroke="#0B1020" stroke-linecap="round" stroke-width="42" d="m512 594 128-160"/>
+</g></g>
+  <line x1="326" y1="88" x2="326" y2="260" stroke="#6B7280" stroke-opacity=".65" stroke-width="2"/>
+  <text x="370" y="166" font-family="Montserrat, Inter, ui-sans-serif, system-ui" font-size="92" font-weight="900" letter-spacing="1" fill="url(#ucpSilver)">UBER</text>
+  <text x="372" y="232" font-family="Montserrat, Inter, ui-sans-serif, system-ui" font-size="42" font-weight="800" letter-spacing="4" fill="#0D47FF">CONTROL</text>
+  <text x="620" y="232" font-family="Montserrat, Inter, ui-sans-serif, system-ui" font-size="42" font-weight="800" letter-spacing="4" fill="#00E676">PRO</text>
+</svg>

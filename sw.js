@@ -1,12 +1,23 @@
-const CACHE_NAME = "uber-control-pro-v18";
+const CACHE_NAME = "uber-control-pro-v20";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=18",
-  "./historical-data.js?v=18",
-  "./app.js?v=18",
+  "./style.css?v=20",
+  "./historical-data.js?v=20",
+  "./app.js?v=20",
   "./manifest.json",
   "./icons/icon.svg",
+  "./icons/logo-dashboard.svg",
+  "./icons/logo-full.svg",
+  "./icons/logo-white.svg",
+  "./icons/logo-black.svg",
+  "./icons/icon-1024.png",
+  "./icons/icon-512.png",
+  "./icons/icon-256.png",
+  "./icons/icon-192.png",
+  "./icons/icon-180.png",
+  "./icons/favicon.png",
+  "./icons/splash-logo.png",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
   "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"
 ];

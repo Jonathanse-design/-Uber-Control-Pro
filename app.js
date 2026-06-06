@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", () => {
   hydrateSettings();
   bindEvents();
   renderAll();
+  document.body.classList.add("app-ready");
   registerServiceWorker();
 });
 
