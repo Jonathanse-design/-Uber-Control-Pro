@@ -11,9 +11,9 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon.svg">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=13">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
-  <script src="app.js?v=5" defer></script>
+  <script src="app.js?v=13" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -48,86 +48,86 @@
       <header class="topbar">
         <button class="icon-button menu-button" id="menuToggle" aria-label="Abrir menú">☰</button>
         <div class="greeting">
+          <h1>Buenos días Jonathan</h1>
           <span id="todayLabel"></span>
-          <h1>Hola, conductor</h1>
         </div>
-        <div class="top-actions">
-          <select id="periodSelect" aria-label="Selector de período">
-            <option value="day">Hoy</option>
-            <option value="week" selected>Semana</option>
-            <option value="month">Mes</option>
-            <option value="year">Año</option>
-          </select>
-          <button class="ghost-button" id="exportXls">Excel</button>
-          <button class="ghost-button" id="exportCsv">CSV</button>
-          <label class="ghost-button file-button">
+        <div class="period-tabs" id="periodTabs" aria-label="Selector de período">
+          <button type="button" data-period="day">Hoy</button>
+          <button type="button" data-period="week" class="active">Semana</button>
+          <button type="button" data-period="month">Mes</button>
+          <button type="button" data-period="year">Año</button>
+        </div>
+        <div class="quick-actions">
+          <button class="quick-button" id="topExport" type="button" aria-label="Exportar CSV">
+            <span class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+            Exportar
+          </button>
+          <label class="quick-button file-button" aria-label="Importar respaldo">
+            <span class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg></span>
             Importar
             <input id="importFile" type="file" accept=".csv,.json">
           </label>
-          <button class="icon-button" id="themeToggle" aria-label="Cambiar modo">◐</button>
+          <button class="quick-button" id="topBackup" type="button" aria-label="Crear respaldo">
+            <span class="action-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M21 3v6h-6"/><path d="M21 9 15 3"/><path d="M9 12h6"/></svg></span>
+            Respaldo
+          </button>
+          <button class="theme-button" id="themeToggle" aria-label="Cambiar modo">◐</button>
         </div>
       </header>
 
       <section class="view active" id="dashboard">
-        <div class="hero-strip">
-          <div>
-            <span>Rentabilidad real</span>
+        <section class="finance-hero">
+          <div class="hero-copy">
+            <span class="eyebrow">Ganancia real</span>
             <h2 id="heroNet">$0</h2>
+            <p id="heroInsight">Ingresos menos operación, reserva y depreciación.</p>
           </div>
-          <div class="hero-metrics">
-            <div><span>Operativa</span><strong id="heroOperating">$0</strong></div>
-            <div><span>Gastos</span><strong id="heroCosts">$0</strong></div>
-            <div><span>Reserva</span><strong id="heroReserve">$0</strong></div>
-          </div>
-        </div>
+          <div class="hero-breakdown" id="heroBreakdown"></div>
+        </section>
 
-        <section class="kpi-grid" id="kpiGrid"></section>
+        <section class="primary-kpis" id="primaryKpis"></section>
+        <section class="secondary-kpis" id="secondaryKpis"></section>
 
-        <section class="dashboard-grid">
-          <article class="panel wide">
+        <section class="dashboard-grid premium-grid">
+          <article class="panel chart-panel main-profit-panel">
             <div class="panel-head">
               <div>
-                <h3>Evolución de ganancias</h3>
-                <p>Ingresos, costos y ganancia real</p>
+                <h3>Evolución de ganancia real</h3>
+                <p>Resultado final después de costos del vehículo</p>
               </div>
               <span class="pill" id="rangePill">Semana</span>
             </div>
             <div class="chart-wrap main-chart"><canvas id="profitChart"></canvas></div>
           </article>
 
-          <article class="panel goals-panel">
+          <article class="panel chart-panel">
             <div class="panel-head">
               <div>
-                <h3>Meta mensual</h3>
-                <p>Proyección automática</p>
-              </div>
-            </div>
-            <div class="ring" id="monthlyRing"><span>0%</span></div>
-            <dl class="metric-list">
-              <div><dt>Faltante</dt><dd id="goalMissing">$0</dd></div>
-              <div><dt>Fecha estimada</dt><dd id="goalEta">-</dd></div>
-              <div><dt>Meta anual</dt><dd id="annualGoal">$0</dd></div>
-            </dl>
-          </article>
-
-          <article class="panel">
-            <div class="panel-head">
-              <div>
-                <h3>Distribución de gastos</h3>
-                <p>Combustible y operación</p>
+                <h3>Ingresos vs gastos</h3>
+                <p>Comparación operativa del período</p>
               </div>
             </div>
             <div class="chart-wrap"><canvas id="expenseChart"></canvas></div>
           </article>
 
-          <article class="panel">
+          <article class="panel goals-panel goals-premium">
             <div class="panel-head">
               <div>
-                <h3>Rentabilidad</h3>
-                <p>Operativa vs real</p>
+                <h3>Metas</h3>
+                <p>Proyección automática por horizonte</p>
               </div>
             </div>
-            <div class="profit-stack" id="profitStack"></div>
+            <div class="mini-goal-rings" id="dashboardGoalRings"></div>
+          </article>
+
+          <article class="panel kia-system-card">
+            <div class="panel-head">
+              <div>
+                <h3>Kia K5 Predictivo</h3>
+                <p>Salud, riesgo y costos futuros</p>
+              </div>
+            </div>
+            <div id="dashboardKiaSystem"></div>
           </article>
         </section>
       </section>
@@ -201,16 +201,12 @@
                 <tr>
                   <th>Fecha</th>
                   <th>Ingresos</th>
-                  <th>Combustible</th>
-                  <th>Otros</th>
-                  <th>Tipo gasto</th>
-                  <th>Viajes</th>
-                  <th>KM inicio</th>
-                  <th>KM final</th>
+                  <th>Gastos</th>
                   <th>KM</th>
+                  <th>Horas</th>
+                  <th>Viajes</th>
                   <th>Operativa</th>
                   <th>Real</th>
-                  <th>Notas</th>
                 </tr>
               </thead>
               <tbody id="historyTable"></tbody>
@@ -232,7 +228,7 @@
           <h2>Metas</h2>
           <p>Progreso y proyecciones para cada horizonte.</p>
         </div>
-        <div class="goals-grid" id="goalsGrid"></div>
+        <div class="goals-grid fitness-goals" id="goalsGrid"></div>
       </section>
 
       <section class="view" id="kia">
@@ -241,11 +237,11 @@
           <p>Salud del vehículo y mantenimiento próximo.</p>
         </div>
         <div class="kia-layout">
-          <article class="panel vehicle-health">
+          <article class="panel vehicle-health predictive-health">
             <span>Estado general</span>
             <strong id="vehicleHealth">0%</strong>
             <div class="health-bar"><span id="vehicleHealthBar"></span></div>
-            <p id="nextMaintenance"></p>
+            <div id="vehicleSystemSummary"></div>
           </article>
           <div class="maintenance-grid" id="maintenanceGrid"></div>
         </div>

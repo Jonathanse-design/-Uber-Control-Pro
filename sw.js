@@ -1,9 +1,9 @@
-const CACHE_NAME = "uber-control-pro-v5";
+const CACHE_NAME = "uber-control-pro-v13";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=5",
-  "./app.js?v=5",
+  "./style.css?v=13",
+  "./app.js?v=13",
   "./manifest.json",
   "./icons/icon.svg",
   "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"

@@ -30,7 +30,7 @@ const fmtNum = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 1 });
 const today = new Date("2026-06-05T12:00:00");
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("todayLabel").textContent = today.toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
   hydrateSettings();
   bindEvents();
   renderAll();
@@ -84,7 +84,7 @@ function totals(data) {
 }
 
 function renderAll() {
-  const period = document.getElementById("periodSelect").value;
+  const period = getSelectedPeriod();
   const data = rangeEntries(period);
   const all = entries.map(enrich);
   const total = totals(data);
@@ -92,44 +92,62 @@ function renderAll() {
   renderKpis(total);
   renderCharts(data);
   renderGoals(all);
-  renderProfitStack(total);
   renderReports(all);
-  renderMaintenance(all);
+  const vehicle = renderMaintenance(all);
+  renderDashboardVehicle(vehicle, total);
   renderHistory();
   renderLiveResults(new FormData(document.getElementById("entryForm")));
 }
 
 function renderHero(total) {
   document.getElementById("heroNet").textContent = fmtMoney.format(total.real);
-  document.getElementById("heroOperating").textContent = fmtMoney.format(total.operating);
-  document.getElementById("heroCosts").textContent = fmtMoney.format(total.gastos);
-  document.getElementById("heroReserve").textContent = fmtMoney.format(total.reserve);
+  document.getElementById("heroInsight").textContent = total.real >= 0
+    ? "Tu operación está creando utilidad real después del vehículo."
+    : "La operación necesita ajuste: el costo real del vehículo supera la utilidad.";
+  const rows = [
+    ["Ingresos", total.ingresos, "plus"],
+    ["Gastos operativos", -total.gastos, "minus"],
+    ["Reserva mantenimiento", -total.reserve, "minus"],
+    ["Depreciación vehículo", -total.depreciation, "minus"]
+  ];
+  document.getElementById("heroBreakdown").innerHTML = rows.map(([label, value, tone]) => `
+    <div class="breakdown-row ${tone}">
+      <span>${label}</span>
+      <strong>${fmtMoney.format(value)}</strong>
+    </div>
+  `).join("");
 }
 
 function renderKpis(total) {
   const perHour = total.horas ? total.real / total.horas : 0;
   const perKm = total.km ? total.real / total.km : 0;
   const roi = total.gastos ? (total.real / total.gastos) * 100 : 0;
-  const items = [
-    ["Ingreso Hoy", todayTotal("ingresos"), "cash", "up"],
-    ["Ingreso Semana", total.ingresos, "calendar", "up"],
-    ["Ingreso Mes", totals(rangeEntries("month")).ingresos, "wallet", "up"],
-    ["Ganancia Neta", total.real, "profit", total.real >= 0 ? "up" : "down"],
+  const primary = [
+    ["Ganancia Real", total.real, "profit", total.real >= 0 ? "up" : "down"],
+    ["Ingreso Semanal", total.ingresos, "calendar", "up"],
     ["Combustible", total.combustible, "fuel", "down"],
-    ["KM Recorridos", total.km, "route", "up", "km"],
-    ["Viajes", total.viajes, "car", "up", "num"],
-    ["Ganancia/Hora", perHour, "clock", "up"],
-    ["Ganancia/KM", perKm, "gauge", perKm >= 0 ? "up" : "down"],
-    ["ROI Vehículo", roi, "roi", roi >= 0 ? "up" : "down", "percent"],
-    ["Reserva Mantenimiento", total.reserve, "wrench", "up"]
+    ["ROI", roi, "roi", roi >= 0 ? "up" : "down", "percent"]
   ];
-  document.getElementById("kpiGrid").innerHTML = items.map(([label, value, icon, trend, kind]) => `
-    <article class="kpi-card">
+  const secondary = [
+    ["KM recorridos", total.km, "route", "up", "km"],
+    ["Viajes", total.viajes, "car", "up", "num"],
+    ["Ganancia/Hora", perHour, "clock", perHour >= 0 ? "up" : "down"],
+    ["Ganancia/KM", perKm, "gauge", perKm >= 0 ? "up" : "down"],
+    ["Reserva", total.reserve, "wrench", "up"]
+  ];
+  document.getElementById("primaryKpis").innerHTML = primary.map(([label, value, icon, trend, kind]) => `
+    <article class="kpi-card primary-kpi">
       <div class="kpi-top"><span>${label}</span><span class="kpi-icon">${iconSvg(icon)}</span></div>
       <div>
         <div class="kpi-value">${formatByKind(value, kind)}</div>
-        <div class="trend ${trend}">${trend === "up" ? "▲" : "▼"} Comparativo anterior</div>
+        <div class="trend ${trend}">${trend === "up" ? "▲" : "▼"} Período actual</div>
       </div>
+    </article>
+  `).join("");
+  document.getElementById("secondaryKpis").innerHTML = secondary.map(([label, value, icon, trend, kind]) => `
+    <article class="mini-kpi">
+      <span class="kpi-icon">${iconSvg(icon)}</span>
+      <div><span>${label}</span><strong>${formatByKind(value, kind)}</strong></div>
     </article>
   `).join("");
 }
@@ -163,7 +181,7 @@ function formatByKind(value, kind) {
 }
 
 function renderCharts(data) {
-  document.getElementById("rangePill").textContent = document.getElementById("periodSelect").selectedOptions[0].textContent;
+  document.getElementById("rangePill").textContent = getSelectedPeriodLabel();
   const labels = data.map(entry => entry.fecha.slice(5));
   const css = getComputedStyle(document.body);
   const primary = css.getPropertyValue("--primary").trim();
@@ -175,21 +193,21 @@ function renderCharts(data) {
     data: {
       labels,
       datasets: [
-        { label: "Ingresos", data: data.map(entry => entry.ingresos), borderColor: primary, backgroundColor: "rgba(37,99,235,.14)", tension: .42, fill: true },
-        { label: "Gastos", data: data.map(entry => entry.gastos), borderColor: danger, backgroundColor: "rgba(239,68,68,.08)", tension: .42, fill: true },
-        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: success, backgroundColor: "rgba(16,185,129,.16)", tension: .42, fill: true }
+        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: primary, backgroundColor: "rgba(37,99,235,.18)", tension: .45, fill: true, pointRadius: 3, pointHoverRadius: 5 }
       ]
     },
     options: chartOptions(muted)
   });
-  const total = totals(data);
   drawChart("expenseChart", {
-    type: "doughnut",
+    type: "bar",
     data: {
-      labels: ["Combustible", "Comida", "Peajes", "Mantenimiento/Otros"],
-      datasets: [{ data: [total.combustible, sumField(data, "comida"), sumField(data, "peajes"), total.otros_gastos], backgroundColor: [primary, "#10b981", "#f59e0b", "#ef4444"], borderWidth: 0 }]
+      labels,
+      datasets: [
+        { label: "Ingresos", data: data.map(entry => entry.ingresos), backgroundColor: "rgba(37,99,235,.72)", borderRadius: 10 },
+        { label: "Gastos", data: data.map(entry => entry.gastos), backgroundColor: "rgba(239,68,68,.58)", borderRadius: 10 }
+      ]
     },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { color: muted, usePointStyle: true } } }, cutout: "68%" }
+    options: chartOptions(muted)
   });
 }
 
@@ -220,29 +238,29 @@ function renderGoals(all) {
   const monthTotal = totals(month);
   const percent = Math.max(0, Math.min(100, Math.round((monthTotal.real / settings.monthlyGoal) * 100)));
   const missing = Math.max(0, settings.monthlyGoal - monthTotal.real);
-  document.getElementById("monthlyRing").style.setProperty("--value", `${percent}%`);
-  document.getElementById("monthlyRing").querySelector("span").textContent = `${percent}%`;
-  document.getElementById("goalMissing").textContent = fmtMoney.format(missing);
-  document.getElementById("goalEta").textContent = estimateEta(monthTotal.real);
-  document.getElementById("annualGoal").textContent = fmtMoney.format(settings.annualGoal);
-
   const goals = [
     ["Diaria", todayTotal("real"), settings.dailyGoal],
     ["Semanal", totals(rangeEntries("week")).real, settings.weeklyGoal],
     ["Mensual", monthTotal.real, settings.monthlyGoal],
     ["Anual", totals(all).real, settings.annualGoal]
   ];
-  document.getElementById("goalsGrid").innerHTML = goals.map(([name, current, goal]) => {
-    const value = Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
-    return `<article class="panel goal-card">
-      <h3>Meta ${name}</h3>
-      <div class="kpi-value">${fmtMoney.format(current)}</div>
-      <p>de ${fmtMoney.format(goal)}</p>
-      <div class="progress-bar" style="--value:${value}%"><span></span></div>
-      <div class="profit-row"><span>Progreso</span><strong>${value}%</strong></div>
-      <div class="profit-row"><span>Faltante</span><strong>${fmtMoney.format(Math.max(0, goal - current))}</strong></div>
-    </article>`;
-  }).join("");
+  const html = goals.map(([name, current, goal]) => goalRing(name, current, goal)).join("");
+  document.getElementById("goalsGrid").innerHTML = html;
+  document.getElementById("dashboardGoalRings").innerHTML = html;
+}
+
+function goalRing(name, current, goal) {
+  const value = Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
+  const missing = Math.max(0, goal - current);
+  const projection = value >= 100 ? "Meta alcanzada" : `Faltan ${fmtMoney.format(missing)}`;
+  return `<article class="goal-ring-card">
+    <div class="fitness-ring" style="--value:${value}%"><span>${value}%</span></div>
+    <div>
+      <h3>${name}</h3>
+      <strong>${fmtMoney.format(current)}</strong>
+      <p>${projection}</p>
+    </div>
+  </article>`;
 }
 
 function estimateEta(current) {
@@ -312,9 +330,16 @@ function renderMaintenance(all) {
   ].map(([name, dueKm, cost]) => ({ name, remaining: Math.max(0, currentKm - dueKm), cost }));
   const health = Math.round(items.reduce((sum, item) => sum + Math.min(100, (item.remaining / 3000) * 100), 0) / items.length);
   const next = [...items].sort((a, b) => a.remaining - b.remaining)[0];
+  const futureCost = items.filter(item => item.remaining <= 3000).reduce((sum, item) => sum + item.cost, 0);
+  const critical = items.filter(item => item.remaining <= 500).length;
+  const risk = critical > 1 ? "Alto" : critical === 1 ? "Medio" : "Bajo";
   document.getElementById("vehicleHealth").textContent = `${health}%`;
   document.getElementById("vehicleHealthBar").style.width = `${health}%`;
-  document.getElementById("nextMaintenance").textContent = `Próximo: ${next.name}, ${fmtNum.format(next.remaining)} km restantes, costo estimado ${fmtMoney.format(next.cost)}.`;
+  document.getElementById("vehicleSystemSummary").innerHTML = `
+    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${next.name}</strong></div>
+    <div class="vehicle-summary-row"><span>Riesgo mecánico</span><strong>${risk}</strong></div>
+    <div class="vehicle-summary-row"><span>Costos futuros</span><strong>${fmtMoney.format(futureCost)}</strong></div>
+  `;
   document.getElementById("maintenanceGrid").innerHTML = items.map(item => `
     <article class="panel maintenance-card">
       <strong>${item.name}</strong>
@@ -323,6 +348,24 @@ function renderMaintenance(all) {
       <div class="profit-row"><span>Costo estimado</span><strong>${fmtMoney.format(item.cost)}</strong></div>
     </article>
   `).join("");
+  return { health, next, futureCost, risk, items };
+}
+
+function renderDashboardVehicle(vehicle, total) {
+  document.getElementById("dashboardKiaSystem").innerHTML = `
+    <div class="kia-score">
+      <div class="fitness-ring vehicle-ring" style="--value:${vehicle.health}%"><span>${vehicle.health}%</span></div>
+      <div>
+        <span>Salud general</span>
+        <strong>${vehicle.risk}</strong>
+        <p>Riesgo mecánico actual</p>
+      </div>
+    </div>
+    <div class="vehicle-summary-row"><span>Fondo mantenimiento</span><strong>${fmtMoney.format(total.reserve)}</strong></div>
+    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${vehicle.next.name}</strong></div>
+    <div class="vehicle-summary-row"><span>KM restantes</span><strong>${fmtNum.format(vehicle.next.remaining)} km</strong></div>
+    <div class="vehicle-summary-row"><span>Costos futuros estimados</span><strong>${fmtMoney.format(vehicle.futureCost)}</strong></div>
+  `;
 }
 
 function renderHistory() {
@@ -346,18 +389,14 @@ function renderHistory() {
     <tr>
       <td><strong>${escapeHtml(formatDate(entry.fecha))}</strong></td>
       <td>${fmtMoney.format(entry.ingresos)}</td>
-      <td>${fmtMoney.format(entry.combustible)}</td>
-      <td>${fmtMoney.format(Number(entry.otros_gastos || 0))}</td>
-      <td>${escapeHtml(entry.tipo_gasto || "-")}</td>
-      <td>${fmtNum.format(Number(entry.viajes || 0))}</td>
-      <td>${fmtNum.format(Number(entry.km_inicio || 0))}</td>
-      <td>${fmtNum.format(Number(entry.km_final || 0))}</td>
+      <td>${fmtMoney.format(entry.gastos)}</td>
       <td>${fmtNum.format(entry.km)}</td>
+      <td>${fmtNum.format(Number(entry.horas || 0))}</td>
+      <td>${fmtNum.format(Number(entry.viajes || 0))}</td>
       <td class="${entry.operating >= 0 ? "money-positive" : "money-negative"}">${fmtMoney.format(entry.operating)}</td>
       <td class="${entry.real >= 0 ? "money-positive" : "money-negative"}">${fmtMoney.format(entry.real)}</td>
-      <td class="note-cell">${escapeHtml(entry.notas || "-")}</td>
     </tr>
-  `).join("") : `<tr class="empty-row"><td colspan="12">No hay registros con ese filtro.</td></tr>`;
+  `).join("") : `<tr class="empty-row"><td colspan="8">No hay registros con ese filtro.</td></tr>`;
 }
 
 function formatDate(value) {
@@ -376,7 +415,12 @@ function escapeHtml(value) {
 
 function bindEvents() {
   document.querySelectorAll(".nav-item").forEach(button => button.addEventListener("click", () => switchView(button.dataset.view)));
-  document.getElementById("periodSelect").addEventListener("change", renderAll);
+  document.querySelectorAll("#periodTabs button").forEach(button => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll("#periodTabs button").forEach(item => item.classList.toggle("active", item === button));
+      renderAll();
+    });
+  });
   document.getElementById("themeToggle").addEventListener("click", () => {
     document.body.classList.toggle("dark");
     localStorage.setItem("ucp_theme", document.body.classList.contains("dark") ? "dark" : "light");
@@ -386,15 +430,28 @@ function bindEvents() {
   document.getElementById("menuToggle").addEventListener("click", () => document.getElementById("sidebar").classList.toggle("open"));
   document.getElementById("entryForm").addEventListener("input", event => renderLiveResults(new FormData(event.currentTarget)));
   document.getElementById("entryForm").addEventListener("submit", saveEntry);
-  document.getElementById("exportCsv").addEventListener("click", () => exportCsv(entries));
-  document.getElementById("backupCsv").addEventListener("click", () => exportCsv(entries));
-  document.getElementById("exportXls").addEventListener("click", exportExcel);
-  document.getElementById("backupXls").addEventListener("click", exportExcel);
-  document.getElementById("backupJson").addEventListener("click", exportJson);
+  bindClick("topExport", () => exportCsv(entries));
+  bindClick("topBackup", exportJson);
+  bindClick("backupCsv", () => exportCsv(entries));
+  bindClick("backupXls", exportExcel);
+  bindClick("backupJson", exportJson);
   document.getElementById("importFile").addEventListener("change", importFile);
   document.getElementById("saveSettings").addEventListener("click", saveSettings);
   document.getElementById("historySearch").addEventListener("input", renderHistory);
   document.getElementById("historyExport").addEventListener("click", () => exportCsv(entries));
+}
+
+function bindClick(id, handler) {
+  const element = document.getElementById(id);
+  if (element) element.addEventListener("click", handler);
+}
+
+function getSelectedPeriod() {
+  return document.querySelector("#periodTabs button.active")?.dataset.period || "week";
+}
+
+function getSelectedPeriodLabel() {
+  return document.querySelector("#periodTabs button.active")?.textContent.trim() || "Semana";
 }
 
 function switchView(id) {
