@@ -256,7 +256,7 @@ function renderKpis(total) {
     </article>
   `).join("");
   document.getElementById("secondaryKpis").innerHTML = secondary.map(([label, value, icon, trend, kind]) => `
-    <article class="mini-kpi">
+    <article class="mini-kpi ${icon}">
       <span class="kpi-icon">${iconSvg(icon)}</span>
       <div><span>${label}</span><strong>${formatByKind(value, kind)}</strong></div>
     </article>
@@ -295,17 +295,16 @@ function renderCharts(data) {
   document.getElementById("rangePill").textContent = getSelectedPeriodLabel();
   const labels = data.map(entry => entry.fecha.slice(5));
   const css = getComputedStyle(document.body);
-  const primary = css.getPropertyValue("--primary").trim();
-  const success = css.getPropertyValue("--success").trim();
-  const danger = css.getPropertyValue("--danger").trim();
-  const warning = css.getPropertyValue("--warning").trim();
+  const success = css.getPropertyValue("--accent-emerald").trim();
+  const danger = css.getPropertyValue("--accent-coral").trim();
+  const warning = css.getPropertyValue("--accent-amber").trim();
   const muted = css.getPropertyValue("--muted").trim();
   drawChart("profitChart", {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: success, backgroundColor: "rgba(166,245,192,.22)", tension: .45, fill: true, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: success }
+        { label: "Ganancia real", data: data.map(entry => entry.real), borderColor: success, backgroundColor: withAlpha(success, .14), tension: .45, fill: true, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: success }
       ]
     },
     options: chartOptions(muted)
@@ -315,13 +314,23 @@ function renderCharts(data) {
     data: {
       labels,
       datasets: [
-        { label: "Ingresos", data: data.map(entry => entry.ingresos), backgroundColor: success, borderRadius: 10 },
-        { label: "Gastos", data: data.map(entry => entry.gastos), backgroundColor: danger, borderRadius: 10 },
-        { label: "Combustible", data: data.map(entry => entry.combustible), backgroundColor: warning, borderRadius: 10 }
+        { label: "Ingresos", data: data.map(entry => entry.ingresos), backgroundColor: withAlpha(success, .78), borderRadius: 10 },
+        { label: "Gastos", data: data.map(entry => entry.otros_gastos), backgroundColor: withAlpha(danger, .76), borderRadius: 10 },
+        { label: "Combustible", data: data.map(entry => entry.combustible), backgroundColor: withAlpha(warning, .78), borderRadius: 10 }
       ]
     },
     options: chartOptions(muted)
   });
+}
+
+function withAlpha(hex, alpha) {
+  const value = String(hex || "#2563EB").trim();
+  if (!value.startsWith("#")) return value;
+  const short = value.length === 4;
+  const r = parseInt(short ? value[1] + value[1] : value.slice(1, 3), 16);
+  const g = parseInt(short ? value[2] + value[2] : value.slice(3, 5), 16);
+  const b = parseInt(short ? value[3] + value[3] : value.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function drawChart(id, config) {
@@ -441,11 +450,12 @@ function renderMaintenance(all) {
   const futureCost = items.filter(item => item.remaining <= 3000).reduce((sum, item) => sum + item.cost, 0);
   const critical = items.filter(item => item.remaining <= 500).length;
   const risk = critical > 1 ? "Alto" : critical === 1 ? "Medio" : "Bajo";
+  const riskClass = risk.toLowerCase();
   document.getElementById("vehicleHealth").textContent = `${health}%`;
   document.getElementById("vehicleHealthBar").style.width = `${health}%`;
   document.getElementById("vehicleSystemSummary").innerHTML = `
     <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${next.name}</strong></div>
-    <div class="vehicle-summary-row"><span>Riesgo mecánico</span><strong>${risk}</strong></div>
+    <div class="vehicle-summary-row"><span>Riesgo mecánico</span><strong class="risk-${riskClass}">${risk}</strong></div>
     <div class="vehicle-summary-row"><span>Costos futuros</span><strong>${fmtMoney.format(futureCost)}</strong></div>
   `;
   document.getElementById("maintenanceGrid").innerHTML = items.map(item => `
@@ -465,7 +475,7 @@ function renderDashboardVehicle(vehicle, total) {
       <div class="fitness-ring vehicle-ring" style="--value:${vehicle.health}%"><span>${vehicle.health}%</span></div>
       <div>
         <span>Salud general</span>
-        <strong>${vehicle.risk}</strong>
+        <strong class="risk-${vehicle.risk.toLowerCase()}">${vehicle.risk}</strong>
         <p>Riesgo mecánico actual</p>
       </div>
     </div>
