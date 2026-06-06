@@ -1,0 +1,19 @@
+{
+  "name": "Uber Control Pro",
+  "short_name": "Uber Control",
+  "description": "PWA premium para medir la rentabilidad real de conductores de Uber.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0B1220",
+  "theme_color": "#2563EB",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

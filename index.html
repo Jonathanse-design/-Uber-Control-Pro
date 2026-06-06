@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563EB">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Uber Control Pro">
+  <title>Uber Control Pro</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=5">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+  <script src="app.js?v=5" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <span class="brand-mark">UC</span>
+        <div>
+          <strong>UBER CONTROL</strong>
+          <span>PRO</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="Principal">
+        <button class="nav-item active" data-view="dashboard"><span>⌁</span>Dashboard</button>
+        <button class="nav-item" data-view="registro"><span>＋</span>Registro Diario</button>
+        <button class="nav-item" data-view="historial"><span>≡</span>Historial</button>
+        <button class="nav-item" data-view="reportes"><span>▥</span>Reportes</button>
+        <button class="nav-item" data-view="metas"><span>◎</span>Metas</button>
+        <button class="nav-item" data-view="kia"><span>◇</span>Kia K5</button>
+        <button class="nav-item" data-view="respaldo"><span>⇅</span>Respaldo</button>
+        <button class="nav-item" data-view="config"><span>⚙</span>Configuración</button>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="status-dot"></span>
+        <div>
+          <strong>Offline first</strong>
+          <span>Listo para instalar</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-button menu-button" id="menuToggle" aria-label="Abrir menú">☰</button>
+        <div class="greeting">
+          <span id="todayLabel"></span>
+          <h1>Hola, conductor</h1>
+        </div>
+        <div class="top-actions">
+          <select id="periodSelect" aria-label="Selector de período">
+            <option value="day">Hoy</option>
+            <option value="week" selected>Semana</option>
+            <option value="month">Mes</option>
+            <option value="year">Año</option>
+          </select>
+          <button class="ghost-button" id="exportXls">Excel</button>
+          <button class="ghost-button" id="exportCsv">CSV</button>
+          <label class="ghost-button file-button">
+            Importar
+            <input id="importFile" type="file" accept=".csv,.json">
+          </label>
+          <button class="icon-button" id="themeToggle" aria-label="Cambiar modo">◐</button>
+        </div>
+      </header>
+
+      <section class="view active" id="dashboard">
+        <div class="hero-strip">
+          <div>
+            <span>Rentabilidad real</span>
+            <h2 id="heroNet">$0</h2>
+          </div>
+          <div class="hero-metrics">
+            <div><span>Operativa</span><strong id="heroOperating">$0</strong></div>
+            <div><span>Gastos</span><strong id="heroCosts">$0</strong></div>
+            <div><span>Reserva</span><strong id="heroReserve">$0</strong></div>
+          </div>
+        </div>
+
+        <section class="kpi-grid" id="kpiGrid"></section>
+
+        <section class="dashboard-grid">
+          <article class="panel wide">
+            <div class="panel-head">
+              <div>
+                <h3>Evolución de ganancias</h3>
+                <p>Ingresos, costos y ganancia real</p>
+              </div>
+              <span class="pill" id="rangePill">Semana</span>
+            </div>
+            <div class="chart-wrap main-chart"><canvas id="profitChart"></canvas></div>
+          </article>
+
+          <article class="panel goals-panel">
+            <div class="panel-head">
+              <div>
+                <h3>Meta mensual</h3>
+                <p>Proyección automática</p>
+              </div>
+            </div>
+            <div class="ring" id="monthlyRing"><span>0%</span></div>
+            <dl class="metric-list">
+              <div><dt>Faltante</dt><dd id="goalMissing">$0</dd></div>
+              <div><dt>Fecha estimada</dt><dd id="goalEta">-</dd></div>
+              <div><dt>Meta anual</dt><dd id="annualGoal">$0</dd></div>
+            </dl>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Distribución de gastos</h3>
+                <p>Combustible y operación</p>
+              </div>
+            </div>
+            <div class="chart-wrap"><canvas id="expenseChart"></canvas></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>Rentabilidad</h3>
+                <p>Operativa vs real</p>
+              </div>
+            </div>
+            <div class="profit-stack" id="profitStack"></div>
+          </article>
+        </section>
+      </section>
+
+      <section class="view" id="registro">
+        <div class="section-title">
+          <h2>Registro diario</h2>
+          <p>Captura rápida con resultados en tiempo real.</p>
+        </div>
+        <div class="entry-layout">
+          <form class="entry-form" id="entryForm">
+            <article class="panel form-card">
+              <h3>Ingresos</h3>
+              <div class="field-grid">
+                <label>Ingresos Uber<input name="ingresos" type="number" step="0.01" value="0"></label>
+                <label>Propinas<input name="propinas" type="number" step="0.01" value="0"></label>
+                <label>Bonos<input name="bonos" type="number" step="0.01" value="0"></label>
+              </div>
+            </article>
+            <article class="panel form-card">
+              <h3>Gastos</h3>
+              <div class="field-grid">
+                <label>Combustible<input name="combustible" type="number" step="0.01" value="0"></label>
+                <label>Comida<input name="comida" type="number" step="0.01" value="0"></label>
+                <label>Peajes<input name="peajes" type="number" step="0.01" value="0"></label>
+                <label>Otros<input name="otros_gastos" type="number" step="0.01" value="0"></label>
+              </div>
+            </article>
+            <article class="panel form-card">
+              <h3>Operación</h3>
+              <div class="field-grid">
+                <label>Horas<input name="horas" type="number" step="0.25" value="8"></label>
+                <label>Viajes<input name="viajes" type="number" step="1" value="0"></label>
+                <label>KM Inicial<input name="km_inicio" type="number" step="1" value="0"></label>
+                <label>KM Final<input name="km_final" type="number" step="1" value="0"></label>
+              </div>
+            </article>
+            <article class="panel form-card">
+              <h3>Notas</h3>
+              <label class="wide-label">Comentarios<textarea name="notas" rows="4"></textarea></label>
+              <button class="primary-button" type="submit">Guardar día</button>
+            </article>
+          </form>
+          <aside class="panel live-results">
+            <h3>Resultados</h3>
+            <div id="liveResults"></div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="historial">
+        <div class="section-title split-title">
+          <div>
+            <h2>Historial diario</h2>
+            <p>Detalle completo de ingresos, gastos, kilómetros, viajes y ganancia real.</p>
+          </div>
+          <button class="ghost-button" id="historyExport">Exportar CSV</button>
+        </div>
+        <div class="history-summary" id="historySummary"></div>
+        <article class="panel history-panel">
+          <div class="history-toolbar">
+            <div>
+              <h3>Datos suministrados</h3>
+              <p id="historyCount">0 registros</p>
+            </div>
+            <input id="historySearch" type="search" placeholder="Buscar por fecha, gasto o nota">
+          </div>
+          <div class="table-scroll">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Ingresos</th>
+                  <th>Combustible</th>
+                  <th>Otros</th>
+                  <th>Tipo gasto</th>
+                  <th>Viajes</th>
+                  <th>KM inicio</th>
+                  <th>KM final</th>
+                  <th>KM</th>
+                  <th>Operativa</th>
+                  <th>Real</th>
+                  <th>Notas</th>
+                </tr>
+              </thead>
+              <tbody id="historyTable"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="view" id="reportes">
+        <div class="section-title">
+          <h2>Reportes</h2>
+          <p>Resumen semanal, mensual y anual con mejores y peores días.</p>
+        </div>
+        <div class="report-grid" id="reportGrid"></div>
+      </section>
+
+      <section class="view" id="metas">
+        <div class="section-title">
+          <h2>Metas</h2>
+          <p>Progreso y proyecciones para cada horizonte.</p>
+        </div>
+        <div class="goals-grid" id="goalsGrid"></div>
+      </section>
+
+      <section class="view" id="kia">
+        <div class="section-title">
+          <h2>Kia K5 2015</h2>
+          <p>Salud del vehículo y mantenimiento próximo.</p>
+        </div>
+        <div class="kia-layout">
+          <article class="panel vehicle-health">
+            <span>Estado general</span>
+            <strong id="vehicleHealth">0%</strong>
+            <div class="health-bar"><span id="vehicleHealthBar"></span></div>
+            <p id="nextMaintenance"></p>
+          </article>
+          <div class="maintenance-grid" id="maintenanceGrid"></div>
+        </div>
+      </section>
+
+      <section class="view" id="respaldo">
+        <div class="section-title">
+          <h2>Respaldo</h2>
+          <p>Exporta, importa y restaura tu información completa.</p>
+        </div>
+        <div class="backup-grid">
+          <button class="panel action-panel" id="backupJson"><strong>JSON</strong><span>Respaldo completo</span></button>
+          <button class="panel action-panel" id="backupCsv"><strong>CSV</strong><span>Datos diarios</span></button>
+          <button class="panel action-panel" id="backupXls"><strong>XLSX</strong><span>Formato compatible con Excel</span></button>
+        </div>
+      </section>
+
+      <section class="view" id="config">
+        <div class="section-title">
+          <h2>Configuración</h2>
+          <p>Ajustes que cambian los cálculos de ganancia real.</p>
+        </div>
+        <article class="panel settings-panel">
+          <label>Reserva por KM<input id="reserveRate" type="number" step="0.01"></label>
+          <label>Depreciación por KM<input id="depreciationRate" type="number" step="0.01"></label>
+          <label>Meta diaria<input id="dailyGoalInput" type="number" step="100"></label>
+          <label>Meta mensual<input id="monthlyGoalInput" type="number" step="1000"></label>
+          <button class="primary-button" id="saveSettings">Guardar ajustes</button>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
