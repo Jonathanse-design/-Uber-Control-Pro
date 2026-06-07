@@ -1,10 +1,10 @@
-const CACHE_NAME = "uber-control-pro-v20";
+const CACHE_NAME = "uber-control-pro-v23";
 const ASSETS = [
   "./",
   "./index.html",
-  "./style.css?v=20",
-  "./historical-data.js?v=20",
-  "./app.js?v=20",
+  "./style.css?v=23",
+  "./historical-data.js?v=23",
+  "./app.js?v=23",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/logo-dashboard.svg",

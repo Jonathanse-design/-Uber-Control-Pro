@@ -6,11 +6,38 @@ const defaultSettings = {
   dailyGoal: 3500,
   weeklyGoal: 22000,
   monthlyGoal: 95000,
-  annualGoal: 1140000
+  annualGoal: 1140000,
+  profileName: "",
+  vehicle: {
+    type: "Automóvil",
+    brand: "",
+    model: "",
+    year: "",
+    fuel: "Gasolina",
+    currentKm: 0
+  }
+};
+
+const demoSettings = {
+  reserveRate: 8,
+  depreciationRate: 4.5,
+  dailyGoal: 4200,
+  weeklyGoal: 25200,
+  monthlyGoal: 108000,
+  annualGoal: 1296000,
+  profileName: "Conductor Demo",
+  vehicle: {
+    type: "Automóvil",
+    brand: "Vehículo",
+    model: "Demo",
+    year: "2026",
+    fuel: "Gasolina",
+    currentKm: 42180
+  }
 };
 
 let entries = initializeEntries();
-let settings = load("ucp_settings", defaultSettings);
+let settings = loadSettings();
 let charts = {};
 
 const fmtMoney = new Intl.NumberFormat("es-DO", { style: "currency", currency: "DOP", maximumFractionDigits: 0 });
@@ -18,12 +45,13 @@ const fmtNum = new Intl.NumberFormat("es-DO", { maximumFractionDigits: 1 });
 const today = new Date("2026-06-05T12:00:00");
 
 document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  renderGreeting();
   setDefaultEntryDate();
   hydrateSettings();
   bindEvents();
   renderAll();
   document.body.classList.add("app-ready");
+  maybeShowWelcome();
   registerServiceWorker();
 });
 
@@ -35,21 +63,43 @@ function load(key, fallback) {
   }
 }
 
+function loadSettings() {
+  return normalizeSettings(load("ucp_settings", defaultSettings));
+}
+
+function normalizeSettings(value = {}) {
+  return {
+    ...defaultSettings,
+    ...value,
+    vehicle: {
+      ...defaultSettings.vehicle,
+      ...(value.vehicle || {})
+    }
+  };
+}
+
 function save() {
   entries = mergeEntries(entries);
+  settings = normalizeSettings(settings);
   localStorage.setItem("ucp_entries", JSON.stringify(entries));
   localStorage.setItem("ucp_settings", JSON.stringify(settings));
 }
 
+function renderGreeting() {
+  const hour = new Date().getHours();
+  const salutation = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+  const title = document.getElementById("greetingTitle");
+  if (title) title.textContent = `${salutation}, conductor`;
+  document.getElementById("todayLabel").textContent = new Date().toLocaleDateString("es-DO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+}
+
 function initializeEntries() {
-  const saved = load("ucp_entries", []);
-  const merged = mergeEntries(starterEntries, saved);
-  localStorage.setItem("ucp_entries", JSON.stringify(merged));
-  return merged;
+  const saved = load("ucp_entries", null);
+  return Array.isArray(saved) ? mergeEntries(saved) : [];
 }
 
 function sourcePriority(source) {
-  return ({ manual: 6, combustible_km: 5, imported_excel: 3, imported_csv: 3, existing_local: 2, uber_ingresos_2026: 1 })[source] || 2;
+  return ({ manual: 6, combustible_km: 5, imported_excel: 3, imported_csv: 3, demo: 2, existing_local: 2, uber_ingresos_2026: 1 })[source] || 2;
 }
 
 function entryMergeKey(entry) {
@@ -65,6 +115,49 @@ function mergeEntries(...groups) {
     if (!current || sourcePriority(entry.source) >= sourcePriority(current.source)) byDate.set(key, entry);
   });
   return [...byDate.values()].sort((a, b) => a.fecha.localeCompare(b.fecha));
+}
+
+function buildDemoEntries() {
+  const expenseTypes = ["Merienda", "Lavado", "Peajes", "Parqueo", "Mantenimiento menor", ""];
+  const records = [];
+  const todayDate = new Date();
+  let odometer = 42180;
+
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = new Date(todayDate);
+    date.setDate(todayDate.getDate() - offset);
+    const day = 29 - offset;
+    const isLightDay = day % 11 === 4;
+    const trips = isLightDay ? 7 + (day % 3) : 12 + (day % 8);
+    const hours = isLightDay ? 4.5 + (day % 2) : 7 + (day % 4) * 0.5;
+    const totalKm = isLightDay ? 68 + (day % 18) : 108 + ((day * 13) % 64);
+    const kmStart = odometer;
+    const kmEnd = kmStart + totalKm;
+    odometer = kmEnd;
+    const income = Math.round((isLightDay ? 2400 : 3600) + ((day * 277) % 1850) + trips * 62);
+    const fuel = Math.round((isLightDay ? 720 : 1120) + ((day * 131) % 760));
+    const expenses = Math.round(180 + ((day * 79) % 620));
+    const netProfit = income - fuel - expenses;
+
+    records.push({
+      fecha: localDateValue(date),
+      fuel,
+      income,
+      expenses,
+      expenseType: expenseTypes[day % expenseTypes.length],
+      trips,
+      kmStart,
+      kmEnd,
+      totalKm,
+      pricePerKm: totalKm ? income / totalKm : 0,
+      netProfit,
+      source: "demo",
+      notes: "Datos demo ficticios · Vehículo Demo · Conductor Demo",
+      hours
+    });
+  }
+
+  return records.map(entry => normalizeEntry(entry, "demo"));
 }
 
 function normalizeEntry(entry, source = entry?.source || "existing_local") {
@@ -291,7 +384,8 @@ function iconSvg(name) {
 }
 
 function todayTotal(key) {
-  return entries.map(enrich).filter(entry => entry.fecha === "2026-06-05").reduce((sum, entry) => sum + Number(entry[key] || 0), 0);
+  const currentDate = localDateValue();
+  return entries.map(enrich).filter(entry => entry.fecha === currentDate).reduce((sum, entry) => sum + Number(entry[key] || 0), 0);
 }
 
 function formatByKind(value, kind) {
@@ -407,6 +501,7 @@ function estimateGoalProjection(name, current, goal) {
 }
 
 function renderReports(all) {
+  const vehicle = getVehicleSummary();
   const reportData = [
     ["Semanal", rangeEntries("week")],
     ["Mensual", rangeEntries("month")],
@@ -429,6 +524,7 @@ function renderReports(all) {
       ${reportRow("KM", `${fmtNum.format(total.km)} km`)}
       ${reportRow("Viajes", fmtNum.format(total.viajes))}
       ${reportRow("Ganancia operativa", fmtMoney.format(total.operating))}
+      ${reportRow("Vehículo", vehicle)}
       ${reportRow("Mejor día", best ? `${best.fecha} · ${fmtMoney.format(best.real)}` : "-")}
       ${reportRow("Peor día", worst ? `${worst.fecha} · ${fmtMoney.format(worst.real)}` : "-")}
     </article>`;
@@ -443,19 +539,14 @@ function renderMaintenance(all) {
   const knownOdometers = all
     .flatMap(entry => [Number(entry.kmStart || entry.km_inicio || 0), Number(entry.kmEnd || entry.km_final || 0)])
     .filter(value => value > 0);
-  const currentKm = knownOdometers.length ? Math.min(...knownOdometers) : 0;
-  const items = [
-    ["Aceite", 7200, 2500],
-    ["Filtro aire motor", 6500, 1800],
-    ["Filtro cabina", 6000, 1200],
-    ["Pastillas de freno", 5300, 6500],
-    ["Batería", 4200, 7800],
-    ["Neumáticos", 10000, 24000],
-    ["Transmisión", 18000, 9000],
-    ["Alineación", 7600, 1600],
-    ["Balanceo", 7500, 1400]
-  ].map(([name, dueKm, cost]) => ({ name, remaining: Math.max(0, currentKm - dueKm), cost }));
-  const health = Math.round(items.reduce((sum, item) => sum + Math.min(100, (item.remaining / 3000) * 100), 0) / items.length);
+  const configuredKm = Number(settings.vehicle?.currentKm || 0);
+  const currentKm = configuredKm || (knownOdometers.length ? Math.max(...knownOdometers) : 0);
+  const items = maintenanceCatalog(settings.vehicle?.type).map(({ name, interval, cost }) => {
+    const progress = interval ? currentKm % interval : 0;
+    const remaining = interval ? Math.max(0, interval - progress) : 0;
+    return { name, interval, remaining, cost };
+  });
+  const health = items.length ? Math.round(items.reduce((sum, item) => sum + Math.min(100, (item.remaining / Math.max(item.interval, 1)) * 100), 0) / items.length) : 0;
   const next = [...items].sort((a, b) => a.remaining - b.remaining)[0];
   const futureCost = items.filter(item => item.remaining <= 3000).reduce((sum, item) => sum + item.cost, 0);
   const critical = items.filter(item => item.remaining <= 500).length;
@@ -464,6 +555,8 @@ function renderMaintenance(all) {
   document.getElementById("vehicleHealth").textContent = `${health}%`;
   document.getElementById("vehicleHealthBar").style.width = `${health}%`;
   document.getElementById("vehicleSystemSummary").innerHTML = `
+    <div class="vehicle-summary-row"><span>Vehículo</span><strong>${escapeHtml(getVehicleSummary())}</strong></div>
+    <div class="vehicle-summary-row"><span>Kilometraje actual</span><strong>${fmtNum.format(currentKm)} km</strong></div>
     <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${next.name}</strong></div>
     <div class="vehicle-summary-row"><span>Riesgo mecánico</span><strong class="risk-${riskClass}">${risk}</strong></div>
     <div class="vehicle-summary-row"><span>Costos futuros</span><strong>${fmtMoney.format(futureCost)}</strong></div>
@@ -476,12 +569,12 @@ function renderMaintenance(all) {
       <div class="profit-row"><span>Costo estimado</span><strong>${fmtMoney.format(item.cost)}</strong></div>
     </article>
   `).join("");
-  return { health, next, futureCost, risk, items };
+  return { health, next, futureCost, risk, items, currentKm };
 }
 
 function renderDashboardVehicle(vehicle, total) {
-  document.getElementById("dashboardKiaSystem").innerHTML = `
-    <div class="kia-score">
+  document.getElementById("dashboardVehicleSystem").innerHTML = `
+    <div class="vehicle-score">
       <div class="fitness-ring vehicle-ring" style="--value:${vehicle.health}%"><span>${vehicle.health}%</span></div>
       <div>
         <span>Salud general</span>
@@ -490,10 +583,43 @@ function renderDashboardVehicle(vehicle, total) {
       </div>
     </div>
     <div class="vehicle-summary-row"><span>Fondo mantenimiento</span><strong>${fmtMoney.format(total.reserve)}</strong></div>
+    <div class="vehicle-summary-row"><span>Vehículo</span><strong>${escapeHtml(getVehicleSummary())}</strong></div>
     <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${vehicle.next.name}</strong></div>
     <div class="vehicle-summary-row"><span>KM restantes</span><strong>${fmtNum.format(vehicle.next.remaining)} km</strong></div>
     <div class="vehicle-summary-row"><span>Costos futuros estimados</span><strong>${fmtMoney.format(vehicle.futureCost)}</strong></div>
   `;
+}
+
+function maintenanceCatalog(type) {
+  if (String(type || "").toLowerCase() === "motocicleta") {
+    return [
+      { name: "Aceite", interval: 3000, cost: 1200 },
+      { name: "Filtro", interval: 6000, cost: 700 },
+      { name: "Cadena", interval: 8000, cost: 2200 },
+      { name: "Neumáticos", interval: 12000, cost: 6500 },
+      { name: "Frenos", interval: 7000, cost: 1800 },
+      { name: "Batería", interval: 18000, cost: 3200 },
+      { name: "Suspensión", interval: 16000, cost: 4200 }
+    ];
+  }
+  return [
+    { name: "Aceite", interval: 7000, cost: 2500 },
+    { name: "Filtro de aceite", interval: 7000, cost: 900 },
+    { name: "Filtro de aire", interval: 10000, cost: 1800 },
+    { name: "Filtro de cabina", interval: 12000, cost: 1200 },
+    { name: "Frenos", interval: 18000, cost: 6500 },
+    { name: "Neumáticos", interval: 35000, cost: 24000 },
+    { name: "Batería", interval: 30000, cost: 7800 },
+    { name: "Transmisión", interval: 50000, cost: 9000 },
+    { name: "Alineación", interval: 10000, cost: 1600 },
+    { name: "Balanceo", interval: 10000, cost: 1400 }
+  ];
+}
+
+function getVehicleSummary() {
+  const vehicle = settings.vehicle || defaultSettings.vehicle;
+  const name = [vehicle.brand, vehicle.model, vehicle.year].map(cleanText).filter(Boolean).join(" ");
+  return name || vehicle.type || "Vehículo";
 }
 
 function renderHistory() {
@@ -576,8 +702,14 @@ function bindEvents() {
   bindClick("backupJson", exportJson);
   document.getElementById("importFile").addEventListener("change", importFile);
   document.getElementById("saveSettings").addEventListener("click", saveSettings);
+  bindClick("saveVehicleSettings", saveSettings);
   document.getElementById("historySearch").addEventListener("input", renderHistory);
   document.getElementById("historyExport").addEventListener("click", () => exportCsv(entries));
+  bindClick("loadDemoWelcome", () => loadDemoData({ skipConfirm: true }));
+  bindClick("startEmptyWelcome", () => startEmptyDashboard({ skipConfirm: true }));
+  bindClick("skipSetupWelcome", () => startEmptyDashboard({ skipConfirm: true, skipSetup: true }));
+  bindClick("loadDemoData", () => loadDemoData());
+  bindClick("resetDashboard", resetDashboard);
 }
 
 function bindClick(id, handler) {
@@ -643,10 +775,17 @@ function saveEntry(event) {
 }
 
 function hydrateSettings() {
+  settings = normalizeSettings(settings);
   document.getElementById("reserveRate").value = settings.reserveRate;
   document.getElementById("depreciationRate").value = settings.depreciationRate;
   document.getElementById("dailyGoalInput").value = settings.dailyGoal;
   document.getElementById("monthlyGoalInput").value = settings.monthlyGoal;
+  document.getElementById("vehicleType").value = settings.vehicle.type;
+  document.getElementById("vehicleBrand").value = settings.vehicle.brand;
+  document.getElementById("vehicleModel").value = settings.vehicle.model;
+  document.getElementById("vehicleYear").value = settings.vehicle.year;
+  document.getElementById("vehicleFuel").value = settings.vehicle.fuel;
+  document.getElementById("vehicleCurrentKm").value = settings.vehicle.currentKm || "";
 }
 
 function saveSettings() {
@@ -655,12 +794,103 @@ function saveSettings() {
     reserveRate: Number(document.getElementById("reserveRate").value),
     depreciationRate: Number(document.getElementById("depreciationRate").value),
     dailyGoal: Number(document.getElementById("dailyGoalInput").value),
-    monthlyGoal: Number(document.getElementById("monthlyGoalInput").value)
+    monthlyGoal: Number(document.getElementById("monthlyGoalInput").value),
+    vehicle: readVehicleForm()
   };
   settings.weeklyGoal = settings.dailyGoal * 6;
   settings.annualGoal = settings.monthlyGoal * 12;
   save();
   renderAll();
+}
+
+function readVehicleForm() {
+  return {
+    type: cleanText(document.getElementById("vehicleType").value) || defaultSettings.vehicle.type,
+    brand: cleanText(document.getElementById("vehicleBrand").value),
+    model: cleanText(document.getElementById("vehicleModel").value),
+    year: cleanText(document.getElementById("vehicleYear").value),
+    fuel: cleanText(document.getElementById("vehicleFuel").value) || defaultSettings.vehicle.fuel,
+    currentKm: readNumber(document.getElementById("vehicleCurrentKm").value)
+  };
+}
+
+function readSetupSettings() {
+  const monthlyGoal = readNumber(document.getElementById("setupMonthlyGoal")?.value);
+  const nextSettings = normalizeSettings({
+    ...defaultSettings,
+    profileName: cleanText(document.getElementById("setupName")?.value),
+    vehicle: {
+      ...defaultSettings.vehicle,
+      type: cleanText(document.getElementById("setupVehicleType")?.value) || defaultSettings.vehicle.type,
+      brand: cleanText(document.getElementById("setupVehicleBrand")?.value),
+      model: cleanText(document.getElementById("setupVehicleModel")?.value),
+      year: cleanText(document.getElementById("setupVehicleYear")?.value)
+    }
+  });
+  if (monthlyGoal > 0) {
+    nextSettings.monthlyGoal = monthlyGoal;
+    nextSettings.annualGoal = monthlyGoal * 12;
+  }
+  nextSettings.weeklyGoal = nextSettings.dailyGoal * 6;
+  return nextSettings;
+}
+
+function maybeShowWelcome() {
+  if (!localStorage.getItem("ucp_onboarding_choice") && !localStorage.getItem("ucp_entries")) {
+    showWelcome();
+  }
+}
+
+function showWelcome() {
+  document.getElementById("welcomeModal")?.classList.add("open");
+}
+
+function hideWelcome() {
+  document.getElementById("welcomeModal")?.classList.remove("open");
+}
+
+function loadDemoData(options = {}) {
+  if (!options.skipConfirm && !confirmResetAction()) return;
+  entries = mergeEntries(buildDemoEntries());
+  settings = normalizeSettings(demoSettings);
+  localStorage.setItem("ucp_onboarding_choice", "demo");
+  save();
+  hydrateSettings();
+  setDefaultEntryDate();
+  renderAll();
+  hideWelcome();
+  switchView("dashboard");
+}
+
+function startEmptyDashboard(options = {}) {
+  if (!options.skipConfirm && !confirmResetAction()) return;
+  entries = [];
+  settings = options.skipSetup ? normalizeSettings(defaultSettings) : readSetupSettings();
+  localStorage.setItem("ucp_onboarding_choice", "empty");
+  save();
+  hydrateSettings();
+  setDefaultEntryDate();
+  renderAll();
+  hideWelcome();
+  switchView("dashboard");
+}
+
+function resetDashboard() {
+  if (!confirmResetAction()) return;
+  localStorage.removeItem("ucp_entries");
+  localStorage.removeItem("ucp_settings");
+  localStorage.removeItem("ucp_onboarding_choice");
+  entries = [];
+  settings = normalizeSettings(defaultSettings);
+  hydrateSettings();
+  setDefaultEntryDate();
+  renderAll();
+  showWelcome();
+  switchView("dashboard");
+}
+
+function confirmResetAction() {
+  return window.confirm("¿Estás seguro?\n\nEsta acción no puede deshacerse.");
 }
 
 function exportCsv(data) {
@@ -676,7 +906,8 @@ function exportJson() {
 
 function exportExcel() {
   const rows = entries.map(enrich).map(toExportRow);
-  const table = `<table><tr>${Object.keys(rows[0]).map(key => `<th>${key}</th>`).join("")}</tr>${rows.map(row => `<tr>${Object.values(row).map(value => `<td>${value}</td>`).join("")}</tr>`).join("")}</table>`;
+  const headers = ["fecha", "fuel", "income", "expenses", "expenseType", "trips", "kmStart", "kmEnd", "totalKm", "pricePerKm", "netProfit", "source", "id", "allowDuplicate", "notes", "hours"];
+  const table = `<table><tr>${headers.map(key => `<th>${key}</th>`).join("")}</tr>${rows.map(row => `<tr>${headers.map(key => `<td>${row[key] ?? ""}</td>`).join("")}</tr>`).join("")}</table>`;
   download("uber-control-pro.xls", "application/vnd.ms-excel", table);
 }
 
@@ -721,7 +952,7 @@ function importFile(event) {
       const text = reader.result;
       const backup = JSON.parse(text);
       entries = mergeEntries(entries, backup.entries || []);
-      settings = backup.settings || settings;
+      settings = normalizeSettings(backup.settings || settings);
     } else if (extension === "xlsx" || extension === "xls") {
       entries = mergeEntries(entries, parseWorkbook(reader.result));
     } else {

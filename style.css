@@ -118,6 +118,55 @@ body.app-ready .splash-screen {
   pointer-events: none;
 }
 
+.welcome-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: none;
+  place-items: center;
+  padding:
+    calc(1rem + var(--safe-top))
+    calc(1rem + var(--safe-right))
+    calc(1rem + var(--safe-bottom))
+    calc(1rem + var(--safe-left));
+  background: rgba(2, 6, 23, .58);
+  backdrop-filter: blur(18px);
+}
+
+.welcome-modal.open { display: grid; }
+
+.welcome-card {
+  width: min(100%, 34rem);
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid var(--border);
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-glass);
+  text-align: center;
+}
+
+.welcome-card img {
+  width: min(18rem, 76vw);
+  margin-bottom: 1rem;
+}
+
+.welcome-card h2 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.25rem); }
+.welcome-card p { color: var(--muted); margin: .7rem auto 1.25rem; max-width: 26rem; }
+.welcome-actions { display: flex; gap: .7rem; justify-content: center; flex-wrap: wrap; }
+.onboarding-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .7rem;
+  margin: 1rem 0 1.2rem;
+  text-align: left;
+}
+
+.onboarding-grid label {
+  color: var(--muted);
+  font-size: .76rem;
+  font-weight: 800;
+}
+
 .material-symbols-rounded {
   direction: ltr;
   display: inline-block;
@@ -778,7 +827,7 @@ textarea { resize: vertical; }
 .progress-bar { height: .6rem; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--card-soft), #94a3b8 8%); }
 .progress-bar span { display: block; height: 100%; width: var(--value); background: var(--progress-color, var(--accent-violet)); }
 
-.kia-layout { display: grid; grid-template-columns: minmax(17rem, 20rem) 1fr; gap: .9rem; align-items: start; }
+.vehicle-layout { display: grid; grid-template-columns: minmax(17rem, 20rem) 1fr; gap: .9rem; align-items: start; }
 .vehicle-health {
   position: sticky;
   top: 6rem;
@@ -814,15 +863,15 @@ textarea { resize: vertical; }
 .maintenance-card.warning { --status-color: var(--accent-amber); --status-soft: var(--accent-amber-soft); border-color: color-mix(in srgb, var(--accent-amber), transparent 52%); }
 .maintenance-card.ok { --status-color: var(--accent-emerald); --status-soft: var(--accent-emerald-soft); border-color: color-mix(in srgb, var(--accent-emerald), transparent 58%); }
 .maintenance-card .progress-bar span { background: var(--status-color); }
-.kia-score {
+.vehicle-score {
   display: flex;
   align-items: center;
   gap: 1rem;
   margin-bottom: 1rem;
 }
 
-.kia-score strong { display: block; font-size: 1.25rem; line-height: 1.15; }
-.kia-score p { font-size: .78rem; }
+.vehicle-score strong { display: block; font-size: 1.25rem; line-height: 1.15; }
+.vehicle-score p { font-size: .78rem; }
 .vehicle-summary-row {
   display: flex;
   justify-content: space-between;
@@ -844,6 +893,26 @@ textarea { resize: vertical; }
 .action-panel strong { display: block; font-size: 1.8rem; }
 .action-panel span { color: var(--muted); }
 .settings-panel { max-width: 42rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.settings-intro {
+  grid-column: 1 / -1;
+}
+.settings-intro h3 {
+  margin: 0;
+}
+.settings-intro p {
+  margin: .25rem 0 0;
+}
+.data-actions-panel {
+  margin-top: .9rem;
+  align-items: center;
+}
+.data-actions-panel h3 { margin: 0; }
+.data-actions-panel p { margin: .25rem 0 0; }
+.danger-action {
+  color: var(--accent-coral);
+  border-color: color-mix(in srgb, var(--accent-coral), transparent 58%);
+  background: var(--accent-coral-soft);
+}
 
 .history-summary {
   display: grid;
@@ -947,7 +1016,7 @@ textarea { resize: vertical; }
 @media (max-width: 1180px) {
   .primary-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .secondary-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .finance-hero, .dashboard-grid, .entry-layout, .kia-layout { grid-template-columns: 1fr; }
+  .finance-hero, .dashboard-grid, .entry-layout, .vehicle-layout { grid-template-columns: 1fr; }
   .vehicle-health { position: static; }
   .live-results { position: static; }
   .maintenance-grid, .report-grid, .goals-grid, .history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1015,7 +1084,7 @@ textarea { resize: vertical; }
   .theme-button { width: 100%; }
   .finance-hero { border-radius: 1.3rem; padding: 1.2rem; align-items: start; }
   .hero-copy h2 { font-size: clamp(2.5rem, 14vw, 4rem); white-space: normal; }
-  .primary-kpis, .secondary-kpis, .mini-goal-rings, .field-grid, .maintenance-grid, .report-grid, .goals-grid, .backup-grid, .settings-panel, .history-summary, .fitness-goals { grid-template-columns: 1fr; }
+  .primary-kpis, .secondary-kpis, .mini-goal-rings, .field-grid, .maintenance-grid, .report-grid, .goals-grid, .backup-grid, .settings-panel, .history-summary, .fitness-goals, .onboarding-grid { grid-template-columns: 1fr; }
   .mini-kpi { min-height: 4.25rem; }
   .split-title, .history-toolbar { align-items: stretch; flex-direction: column; }
   .history-toolbar input { width: 100%; }

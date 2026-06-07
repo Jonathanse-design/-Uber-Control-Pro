@@ -1,25 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Uber Control Pro">
   <defs>
-  <linearGradient id="ucpGauge" x1="120" x2="880" y1="120" y2="900" gradientUnits="userSpaceOnUse">
-    <stop stop-color="#0D47FF"/>
-    <stop offset=".55" stop-color="#00C6FF"/>
-    <stop offset="1" stop-color="#00E676"/>
-  </linearGradient>
-  <linearGradient id="ucpSilver" x1="0" x2="0" y1="0" y2="1">
-    <stop stop-color="#FFFFFF"/>
-    <stop offset="1" stop-color="#D9E2EF"/>
-  </linearGradient>
-  <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
-    <feGaussianBlur stdDeviation="18" result="blur"/>
-    <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0.03 0 0 0 0 0.43 0 0 0 0 1 0 0 0 .55 0"/>
-    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-  </filter>
-</defs>
-  <rect width="1024" height="1024" rx="232" fill="#0B1020"/>
-  <g filter="url(#softGlow)">
-  <path fill="url(#ucpGauge)" d="M184 594c0-177 143-320 320-320s320 143 320 320v36c0 31-25 56-56 56H656c-31 0-56-25-56-56v-36c0-53-43-96-96-96s-96 43-96 96v36c0 31-25 56-56 56H240c-31 0-56-25-56-56v-36Z"/>
-  <path fill="url(#ucpSilver)" d="M292 318c55-54 132-88 216-88 85 0 162 34 218 90l-92 93c-32-31-76-50-124-50-49 0-93 19-125 51l-93-96Z"/>
-  <circle cx="512" cy="594" r="78" fill="url(#ucpSilver)"/>
-  <path stroke="#0B1020" stroke-linecap="round" stroke-width="42" d="m512 594 128-160"/>
-</g>
+    <linearGradient id="gauge" x1="156" x2="856" y1="320" y2="690" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0D47FF"/>
+      <stop offset=".52" stop-color="#00C6FF"/>
+      <stop offset="1" stop-color="#00E6C7"/>
+    </linearGradient>
+    <linearGradient id="silver" x1="360" x2="620" y1="250" y2="455" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/>
+      <stop offset=".58" stop-color="#F6FAFF"/>
+      <stop offset="1" stop-color="#DCE8F6"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="0 0 0 0 0 0 0 0 0 .56 0 0 0 0 1 0 0 0 .56 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="28" stdDeviation="26" flood-color="#001A33" flood-opacity=".45"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" rx="232" fill="#071326"/>
+  <g filter="url(#glow)">
+    <g filter="url(#shadow)">
+      <path fill="url(#gauge)" d="M180 600c0-182 148-330 330-330s330 148 330 330v34c0 34-28 62-62 62H654c-34 0-62-28-62-62v-34c0-51-41-92-92-92s-92 41-92 92v34c0 34-28 62-62 62H242c-34 0-62-28-62-62v-34Z"/>
+      <path fill="url(#silver)" d="M288 318c58-56 136-90 224-90 86 0 164 34 222 88l-90 96c-36-34-85-55-138-55-54 0-102 21-138 55l-80-94Z"/>
+      <circle cx="512" cy="612" r="80" fill="url(#silver)"/>
+      <path d="m512 612 142-172" fill="none" stroke="#061426" stroke-width="46" stroke-linecap="round"/>
+    </g>
+  </g>
 </svg>

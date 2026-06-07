@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2563EB">
+  <meta name="theme-color" content="#071326">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Uber Control Pro">
@@ -14,15 +14,41 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=23">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="historical-data.js?v=20" defer></script>
-  <script src="app.js?v=20" defer></script>
+  <script src="historical-data.js?v=23" defer></script>
+  <script src="app.js?v=23" defer></script>
 </head>
 <body>
   <div class="splash-screen" id="splashScreen" aria-hidden="true">
     <img src="icons/splash-logo.png" alt="">
+  </div>
+  <div class="welcome-modal" id="welcomeModal" aria-modal="true" role="dialog" aria-labelledby="welcomeTitle">
+    <article class="welcome-card">
+      <img src="icons/logo-full.svg" alt="Uber Control Pro">
+      <h2 id="welcomeTitle">Bienvenido a Uber Control Pro</h2>
+      <p>Explora una demostración completa con datos ficticios o configura tu vehículo para empezar desde cero.</p>
+      <div class="onboarding-grid">
+        <label>Nombre opcional<input id="setupName" type="text" placeholder="Conductor"></label>
+        <label>Tipo de vehículo<select id="setupVehicleType">
+          <option>Automóvil</option>
+          <option>SUV</option>
+          <option>Camioneta</option>
+          <option>Motocicleta</option>
+          <option>Otro</option>
+        </select></label>
+        <label>Marca<input id="setupVehicleBrand" type="text" placeholder="Marca"></label>
+        <label>Modelo<input id="setupVehicleModel" type="text" placeholder="Modelo"></label>
+        <label>Año<input id="setupVehicleYear" type="number" min="1980" max="2100" placeholder="2026"></label>
+        <label>Meta mensual<input id="setupMonthlyGoal" type="number" step="1000" placeholder="95000"></label>
+      </div>
+      <div class="welcome-actions">
+        <button class="primary-button" id="loadDemoWelcome">Ver Demo</button>
+        <button class="ghost-button" id="startEmptyWelcome">Comenzar Desde Cero</button>
+        <button class="ghost-button" id="skipSetupWelcome">Omitir</button>
+      </div>
+    </article>
   </div>
   <div class="app-shell">
     <aside class="sidebar" id="sidebar">
@@ -39,15 +65,15 @@
         <button class="nav-item" data-view="historial"><span class="material-symbols-rounded">history</span>Historial</button>
         <button class="nav-item" data-view="reportes"><span class="material-symbols-rounded">analytics</span>Reportes</button>
         <button class="nav-item" data-view="metas"><span class="material-symbols-rounded">flag</span>Metas</button>
-        <button class="nav-item" data-view="kia"><span class="material-symbols-rounded">directions_car</span>Kia K5</button>
+        <button class="nav-item" data-view="vehiculo"><span class="material-symbols-rounded">directions_car</span>Vehículo</button>
         <button class="nav-item" data-view="respaldo"><span class="material-symbols-rounded">cloud_sync</span>Respaldo</button>
         <button class="nav-item" data-view="config"><span class="material-symbols-rounded">settings</span>Configuración</button>
       </nav>
       <div class="sidebar-foot">
         <span class="status-dot"></span>
         <div>
-          <strong>Offline first</strong>
-          <span>Listo para instalar</span>
+          <strong>Mi Perfil</strong>
+          <span>Conductor</span>
         </div>
       </div>
     </aside>
@@ -57,7 +83,7 @@
         <button class="icon-button menu-button" id="menuToggle" aria-label="Abrir menú">☰</button>
         <img class="topbar-logo" src="icons/logo-dashboard.svg" alt="Uber Control Pro">
         <div class="greeting">
-          <h1>Buenos días Jonathan</h1>
+          <h1 id="greetingTitle">Buenos días, conductor</h1>
           <span id="todayLabel"></span>
         </div>
         <div class="period-tabs" id="periodTabs" aria-label="Selector de período">
@@ -130,14 +156,14 @@
             <div class="mini-goal-rings" id="dashboardGoalRings"></div>
           </article>
 
-          <article class="panel kia-system-card">
+          <article class="panel vehicle-system-card">
             <div class="panel-head">
               <div>
-                <h3>Kia K5 Predictivo</h3>
-                <p>Salud, riesgo y costos futuros</p>
+                <h3>Centro de Vehículo</h3>
+                <p>Estado, riesgo y costos futuros</p>
               </div>
             </div>
-            <div id="dashboardKiaSystem"></div>
+            <div id="dashboardVehicleSystem"></div>
           </article>
         </section>
       </section>
@@ -152,7 +178,7 @@
             <article class="panel form-card">
               <h3>Ingresos</h3>
               <div class="field-grid">
-                <label>Ingresos Uber<input name="ingresos" type="number" step="0.01" value="0"></label>
+                <label>Ingresos<input name="ingresos" type="number" step="0.01" value="0"></label>
                 <label>Propinas<input name="propinas" type="number" step="0.01" value="0"></label>
                 <label>Bonos<input name="bonos" type="number" step="0.01" value="0"></label>
               </div>
@@ -242,12 +268,12 @@
         <div class="goals-grid fitness-goals" id="goalsGrid"></div>
       </section>
 
-      <section class="view" id="kia">
+      <section class="view" id="vehiculo">
         <div class="section-title">
-          <h2>Kia K5 2015</h2>
-          <p>Salud del vehículo y mantenimiento próximo.</p>
+          <h2>Centro de Vehículo</h2>
+          <p>Estado general del vehículo y mantenimiento próximo.</p>
         </div>
-        <div class="kia-layout">
+        <div class="vehicle-layout">
           <article class="panel vehicle-health predictive-health">
             <span>Estado general</span>
             <strong id="vehicleHealth">0%</strong>
@@ -281,6 +307,39 @@
           <label>Meta diaria<input id="dailyGoalInput" type="number" step="100"></label>
           <label>Meta mensual<input id="monthlyGoalInput" type="number" step="1000"></label>
           <button class="primary-button" id="saveSettings">Guardar ajustes</button>
+        </article>
+        <article class="panel settings-panel vehicle-settings-panel">
+          <div class="settings-intro">
+            <h3>Datos del Vehículo</h3>
+            <p>Estos datos personalizan reportes, mantenimiento y costos operativos.</p>
+          </div>
+          <label>Tipo de vehículo<select id="vehicleType">
+            <option>Automóvil</option>
+            <option>SUV</option>
+            <option>Camioneta</option>
+            <option>Motocicleta</option>
+            <option>Otro</option>
+          </select></label>
+          <label>Marca<input id="vehicleBrand" type="text" placeholder="Marca"></label>
+          <label>Modelo<input id="vehicleModel" type="text" placeholder="Modelo"></label>
+          <label>Año<input id="vehicleYear" type="number" min="1980" max="2100" placeholder="2026"></label>
+          <label>Combustible<select id="vehicleFuel">
+            <option>Gasolina</option>
+            <option>Diésel</option>
+            <option>GLP</option>
+            <option>Eléctrico</option>
+            <option>Híbrido</option>
+          </select></label>
+          <label>Kilometraje actual<input id="vehicleCurrentKm" type="number" step="1" min="0" placeholder="0"></label>
+          <button class="primary-button" id="saveVehicleSettings">Guardar vehículo</button>
+        </article>
+        <article class="panel settings-panel data-actions-panel">
+          <div>
+            <h3>Datos de demostración</h3>
+            <p>Usa información ficticia para mostrar el producto sin exponer datos reales.</p>
+          </div>
+          <button class="ghost-button" id="loadDemoData">📊 Cargar Datos Demo</button>
+          <button class="ghost-button danger-action" id="resetDashboard">🗑 Reiniciar Dashboard</button>
         </article>
       </section>
     </main>
