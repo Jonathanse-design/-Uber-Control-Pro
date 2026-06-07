@@ -170,6 +170,9 @@ function normalizeEntry(entry, source = entry?.source || "existing_local") {
   const totalKm = providedKm || (hasValue(kmStart) && hasValue(kmEnd) ? Math.abs(kmEnd - kmStart) : 0);
   const providedProfit = firstValue(entry.netProfit, entry.GANANCIAS, entry["GANANCIAS "], entry.ganancias);
   const netProfit = hasValue(providedProfit) ? readNumber(providedProfit) : income - fuel - expenses;
+  const hours = readHours(
+    fieldValue(entry, "hours", "horas", "HORAS", "HORAS TRABAJADAS", "TIEMPO", "TIEMPO TRABAJADO", "HORAS UBER", "DURACIÓN", "DURACION", "HOURS", "WORKED HOURS")
+  );
   const normalizedSource = source || entry.source || "existing_local";
   return {
     fecha: normalizeDate(entry.fecha || entry.FECHA || entry.date),
@@ -187,12 +190,18 @@ function normalizeEntry(entry, source = entry?.source || "existing_local") {
     netProfit,
     source: normalizedSource,
     notes: cleanText(entry.notes ?? entry.notas),
-    hours: readNumber(entry.hours, entry.horas)
+    hours
   };
 }
 
 function firstValue(...values) {
   return values.find(hasValue);
+}
+
+function fieldValue(entry, ...aliases) {
+  if (!entry) return undefined;
+  const normalized = Object.fromEntries(Object.entries(entry).map(([key, value]) => [cleanHeader(key), value]));
+  return aliases.map(cleanHeader).map(key => normalized[key]).find(hasValue);
 }
 
 function hasValue(value) {
@@ -205,6 +214,27 @@ function readNumber(...values) {
   if (typeof value === "number") return Number.isFinite(value) ? value : 0;
   const parsed = Number(String(value).replace(/,/g, "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function readHours(...values) {
+  const value = firstValue(...values);
+  if (!hasValue(value)) return 0;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return Math.max(0, value.getHours() + value.getMinutes() / 60);
+  if (typeof value === "number") return Math.max(0, Number.isFinite(value) ? value : 0);
+  const text = String(value).trim().toLowerCase().replace(",", ".");
+  const timeMatch = text.match(/^(-?\d+(?:\.\d+)?):(\d{1,2})$/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const minutes = Number(timeMatch[2]);
+    return Math.max(0, hours + minutes / 60);
+  }
+  const humanMatch = text.match(/(-?\d+(?:\.\d+)?)\s*h(?:oras?)?\s*(?:(\d+(?:\.\d+)?)\s*m(?:in(?:utos?)?)?)?/);
+  if (humanMatch) {
+    const hours = Number(humanMatch[1]);
+    const minutes = Number(humanMatch[2] || 0);
+    return Math.max(0, hours + minutes / 60);
+  }
+  return Math.max(0, readNumber(text));
 }
 
 function cleanText(value) {
@@ -333,7 +363,9 @@ function renderHero(total) {
 }
 
 function renderKpis(total) {
-  const perHour = total.horas ? total.real / total.horas : 0;
+  const profitPerHour = total.horas ? total.operating / total.horas : null;
+  const incomePerHour = total.horas ? total.ingresos / total.horas : null;
+  const costPerHour = total.horas ? (total.gastos + total.reserve + total.depreciation) / total.horas : null;
   const perKm = total.km ? total.real / total.km : 0;
   const roi = total.gastos ? (total.real / total.gastos) * 100 : 0;
   const primary = [
@@ -343,9 +375,12 @@ function renderKpis(total) {
     ["ROI", roi, "roi", roi >= 0 ? "up" : "down", "percent"]
   ];
   const secondary = [
-    ["KM recorridos", total.km, "route", "up", "km"],
+    ["Horas trabajadas", total.horas, "timer", "up", "hours"],
+    ["Ganancia/Hora", profitPerHour, "clock", profitPerHour === null || profitPerHour >= 0 ? "up" : "down", "hourly"],
+    ["Ingreso/Hora", incomePerHour, "wallet", "up", "hourly"],
+    ["Costo/Hora", costPerHour, "cash", "down", "hourly"],
     ["Viajes", total.viajes, "car", "up", "num"],
-    ["Ganancia/Hora", perHour, "clock", perHour >= 0 ? "up" : "down"],
+    ["KM recorridos", total.km, "route", "up", "km"],
     ["Ganancia/KM", perKm, "gauge", perKm >= 0 ? "up" : "down"],
     ["Reserva", total.reserve, "wrench", "up"]
   ];
@@ -375,6 +410,7 @@ function iconSvg(name) {
     fuel: "local_gas_station",
     route: "route",
     car: "directions_car",
+    timer: "timer",
     clock: "schedule",
     gauge: "speed",
     roi: "trending_up",
@@ -391,6 +427,8 @@ function todayTotal(key) {
 function formatByKind(value, kind) {
   if (kind === "km") return `${fmtNum.format(value)} km`;
   if (kind === "num") return fmtNum.format(value);
+  if (kind === "hours") return value ? `${fmtNum.format(value)} h` : "Sin horas registradas";
+  if (kind === "hourly") return value === null || value === undefined ? "Sin horas registradas" : `${fmtMoney.format(value)}/h`;
   if (kind === "percent") return `${fmtNum.format(value)}%`;
   return fmtMoney.format(value);
 }
@@ -479,6 +517,13 @@ function goalRing(name, current, goal) {
   const value = Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
   const missing = Math.max(0, goal - current);
   const projection = value >= 100 ? "Meta alcanzada" : `Proyección: ${estimateGoalProjection(name, current, goal)}`;
+  const hours = goalHours(name);
+  const actualHourly = hours ? current / hours : null;
+  const neededHourly = hours ? goal / hours : null;
+  const hourlyPace = hours
+    ? `${formatByKind(actualHourly, "hourly")} · Necesario ${formatByKind(neededHourly, "hourly")}`
+    : "Sin horas registradas";
+  const paceState = hours ? (actualHourly >= neededHourly ? "Sobre ritmo" : "Bajo ritmo") : "Ritmo pendiente";
   const ringTone = current >= goal ? "positive" : current >= 0 ? "warning" : "negative";
   return `<article class="goal-ring-card ${ringTone}">
     <div class="fitness-ring" style="--value:${value}%"><span>${value}%</span></div>
@@ -486,9 +531,18 @@ function goalRing(name, current, goal) {
       <h3>${name}</h3>
       <strong>${fmtMoney.format(current)}</strong>
       <p>${projection}</p>
+      <p>${hourlyPace}</p>
+      <p>${paceState}</p>
       <p>Faltante ${fmtMoney.format(missing)}</p>
     </div>
   </article>`;
+}
+
+function goalHours(name) {
+  if (name === "Diaria") return todayTotal("horas");
+  if (name === "Semanal") return totals(rangeEntries("week")).horas;
+  if (name === "Mensual") return totals(entries.map(enrich).filter(entry => entry.fecha.startsWith("2026-06"))).horas;
+  return totals(entries.map(enrich)).horas;
 }
 
 function estimateGoalProjection(name, current, goal) {
@@ -511,6 +565,11 @@ function renderReports(all) {
     const total = totals(data);
     const best = [...data].sort((a, b) => b.real - a.real)[0];
     const worst = [...data].sort((a, b) => a.real - b.real)[0];
+    const daysWithData = Math.max(1, new Set(data.map(entry => entry.fecha)).size);
+    const averageHours = total.horas / daysWithData;
+    const hourlyDays = data.filter(entry => Number(entry.horas || 0) > 0);
+    const bestHourly = [...hourlyDays].sort((a, b) => hourlyProfit(b) - hourlyProfit(a))[0];
+    const worstHourly = [...hourlyDays].sort((a, b) => hourlyProfit(a) - hourlyProfit(b))[0];
     return `<article class="panel report-card">
       <h3>${label}</h3>
       <div class="report-highlight ${total.real >= 0 ? "positive" : "negative"}">
@@ -520,19 +579,27 @@ function renderReports(all) {
       ${reportRow("Ingresos", fmtMoney.format(total.ingresos))}
       ${reportRow("Gastos", fmtMoney.format(total.gastos))}
       ${reportRow("Combustible", fmtMoney.format(total.combustible))}
-      ${reportRow("Horas", fmtNum.format(total.horas))}
+      ${reportRow("Horas trabajadas", total.horas ? `${fmtNum.format(total.horas)} h` : "Sin horas registradas")}
+      ${reportRow("Promedio horas/día", total.horas ? `${fmtNum.format(averageHours)} h` : "Sin horas registradas")}
+      ${reportRow("Ganancia promedio/hora", formatByKind(total.horas ? total.operating / total.horas : null, "hourly"))}
       ${reportRow("KM", `${fmtNum.format(total.km)} km`)}
       ${reportRow("Viajes", fmtNum.format(total.viajes))}
       ${reportRow("Ganancia operativa", fmtMoney.format(total.operating))}
       ${reportRow("Vehículo", vehicle)}
       ${reportRow("Mejor día", best ? `${best.fecha} · ${fmtMoney.format(best.real)}` : "-")}
       ${reportRow("Peor día", worst ? `${worst.fecha} · ${fmtMoney.format(worst.real)}` : "-")}
+      ${reportRow("Mejor día por hora", bestHourly ? `${bestHourly.fecha} · ${formatByKind(hourlyProfit(bestHourly), "hourly")}` : "Sin horas registradas")}
+      ${reportRow("Peor día por hora", worstHourly ? `${worstHourly.fecha} · ${formatByKind(hourlyProfit(worstHourly), "hourly")}` : "Sin horas registradas")}
     </article>`;
   }).join("");
 }
 
 function reportRow(label, value) {
   return `<div class="report-row"><span>${label}</span><strong>${value}</strong></div>`;
+}
+
+function hourlyProfit(entry) {
+  return Number(entry.horas || 0) ? Number(entry.operating || 0) / Number(entry.horas || 1) : 0;
 }
 
 function renderMaintenance(all) {
@@ -643,9 +710,9 @@ function renderHistory() {
       <td><strong>${escapeHtml(formatDate(entry.fecha))}</strong></td>
       <td>${fmtMoney.format(entry.ingresos)}</td>
       <td>${fmtMoney.format(entry.gastos)}</td>
-      <td>${fmtNum.format(entry.km)}</td>
-      <td>${fmtNum.format(Number(entry.horas || 0))}</td>
       <td>${fmtNum.format(Number(entry.viajes || 0))}</td>
+      <td>${entry.horas ? `${fmtNum.format(Number(entry.horas || 0))} h` : "Sin horas"}</td>
+      <td>${fmtNum.format(entry.km)}</td>
       <td class="${entry.operating >= 0 ? "money-positive" : "money-negative"}">${fmtMoney.format(entry.operating)}</td>
       <td class="${entry.real >= 0 ? "money-positive" : "money-negative"}">${fmtMoney.format(entry.real)}</td>
     </tr>
@@ -734,14 +801,25 @@ function switchView(id) {
 function renderLiveResults(formData) {
   const values = Object.fromEntries(formData.entries());
   const result = enrich(values);
+  const profitPerHour = result.horas ? result.operating / result.horas : null;
+  const incomePerHour = result.horas ? result.ingresos / result.horas : null;
+  const costPerHour = result.horas ? (result.gastos + result.reserve + result.depreciation) / result.horas : null;
   const rows = [
     ["Ganancia neta", result.real],
-    ["Ganancia por hora", result.horas ? result.real / result.horas : 0],
+    ["Ganancia por hora", profitPerHour, "hourly"],
+    ["Ingreso por hora", incomePerHour, "hourly"],
+    ["Costo por hora", costPerHour, "hourly"],
     ["Ganancia por viaje", result.viajes ? result.real / result.viajes : 0],
     ["Costo por KM", result.km ? result.gastos / result.km : 0],
     ["ROI diario", result.gastos ? (result.real / result.gastos) * 100 : 0, "percent"]
   ];
-  document.getElementById("liveResults").innerHTML = rows.map(([label, value, kind]) => `<div class="profit-row"><span>${label}</span><strong>${kind === "percent" ? `${fmtNum.format(value)}%` : fmtMoney.format(value)}</strong></div>`).join("");
+  document.getElementById("liveResults").innerHTML = rows.map(([label, value, kind]) => `<div class="profit-row"><span>${label}</span><strong>${formatLiveValue(value, kind)}</strong></div>`).join("");
+}
+
+function formatLiveValue(value, kind) {
+  if (kind === "percent") return `${fmtNum.format(value)}%`;
+  if (kind === "hourly") return formatByKind(value, "hourly");
+  return fmtMoney.format(value);
 }
 
 function saveEntry(event) {
@@ -757,6 +835,9 @@ function saveEntry(event) {
     id: `manual-${selectedDate}-${Date.now()}`,
     allowDuplicate: false
   }, "manual");
+  if (manualEntry.hours > 24 && !window.confirm("Las horas trabajadas superan 24 en una sola jornada. ¿Deseas guardar el registro para revisarlo manualmente?")) {
+    return;
+  }
   if (existingIndex >= 0) {
     const updateExisting = window.confirm("Ya existe un registro para esta fecha. ¿Deseas actualizarlo o crear uno nuevo?\n\nAceptar: actualizarlo.\nCancelar: crear uno nuevo.");
     if (updateExisting) {
@@ -951,12 +1032,18 @@ function importFile(event) {
     if (extension === "json") {
       const text = reader.result;
       const backup = JSON.parse(text);
-      entries = mergeEntries(entries, backup.entries || []);
+      const imported = (backup.entries || []).map(entry => normalizeEntry(entry));
+      warnLongHourEntries(imported);
+      entries = mergeEntries(entries, imported);
       settings = normalizeSettings(backup.settings || settings);
     } else if (extension === "xlsx" || extension === "xls") {
-      entries = mergeEntries(entries, parseWorkbook(reader.result));
+      const imported = parseWorkbook(reader.result);
+      warnLongHourEntries(imported);
+      entries = mergeEntries(entries, imported);
     } else {
-      entries = mergeEntries(entries, parseCsv(reader.result));
+      const imported = parseCsv(reader.result);
+      warnLongHourEntries(imported);
+      entries = mergeEntries(entries, imported);
     }
     save();
     hydrateSettings();
@@ -965,6 +1052,13 @@ function importFile(event) {
   };
   if (file.name.match(/\.(xlsx|xls)$/i)) reader.readAsArrayBuffer(file);
   else reader.readAsText(file);
+}
+
+function warnLongHourEntries(imported) {
+  const longDays = imported.filter(entry => Number(entry.hours || 0) > 24);
+  if (longDays.length) {
+    alert(`${longDays.length} registro${longDays.length === 1 ? "" : "s"} tienen más de 24 horas trabajadas. Se importaron para revisión manual.`);
+  }
 }
 
 function parseCsv(text) {

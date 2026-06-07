@@ -14,11 +14,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,0,0" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=23">
+  <link rel="stylesheet" href="style.css?v=24">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="historical-data.js?v=23" defer></script>
-  <script src="app.js?v=23" defer></script>
+  <script src="historical-data.js?v=24" defer></script>
+  <script src="app.js?v=24" defer></script>
 </head>
 <body>
   <div class="splash-screen" id="splashScreen" aria-hidden="true">
@@ -196,7 +196,7 @@
               <h3>Operación</h3>
               <div class="field-grid">
                 <label>Fecha del registro<input name="fecha" id="entryDate" type="date"></label>
-                <label>Horas<input name="horas" type="number" step="0.25" value="8"></label>
+                <label>Horas trabajadas<input name="horas" type="number" step="0.25" min="0" placeholder="Ejemplo: 6.5" value="8"></label>
                 <label>Viajes<input name="viajes" type="number" step="1" value="0"></label>
                 <label>KM Inicial<input name="km_inicio" type="number" step="1" value="0"></label>
                 <label>KM Final<input name="km_final" type="number" step="1" value="0"></label>
@@ -239,9 +239,9 @@
                   <th>Fecha</th>
                   <th>Ingresos</th>
                   <th>Gastos</th>
-                  <th>KM</th>
-                  <th>Horas</th>
                   <th>Viajes</th>
+                  <th>Horas</th>
+                  <th>KM</th>
                   <th>Operativa</th>
                   <th>Real</th>
                 </tr>
