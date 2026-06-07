@@ -862,6 +862,7 @@ textarea { resize: vertical; }
 .maintenance-card.critical { --status-color: var(--accent-coral); --status-soft: var(--accent-coral-soft); border-color: color-mix(in srgb, var(--accent-coral), transparent 58%); }
 .maintenance-card.warning { --status-color: var(--accent-amber); --status-soft: var(--accent-amber-soft); border-color: color-mix(in srgb, var(--accent-amber), transparent 52%); }
 .maintenance-card.ok { --status-color: var(--accent-emerald); --status-soft: var(--accent-emerald-soft); border-color: color-mix(in srgb, var(--accent-emerald), transparent 58%); }
+.maintenance-card.unconfigured { --status-color: var(--muted); --status-soft: var(--card-soft); border-color: var(--border); }
 .maintenance-card .progress-bar span { background: var(--status-color); }
 .vehicle-score {
   display: flex;
@@ -884,6 +885,14 @@ textarea { resize: vertical; }
 .vehicle-summary-row:last-child { border-bottom: 0; }
 .vehicle-summary-row span { color: var(--muted); }
 .vehicle-summary-row strong { text-align: right; font-size: .92rem; line-height: 1.2; }
+.vehicle-note {
+  margin: .8rem 0;
+  padding: .8rem;
+  border-radius: .9rem;
+  background: var(--card-soft);
+  font-size: .78rem;
+  line-height: 1.35;
+}
 .risk-bajo { color: var(--accent-emerald); }
 .risk-medio { color: var(--accent-amber); }
 .risk-alto { color: var(--accent-coral); }
@@ -901,6 +910,40 @@ textarea { resize: vertical; }
 }
 .settings-intro p {
   margin: .25rem 0 0;
+}
+.maintenance-settings-panel {
+  display: grid;
+  gap: .9rem;
+  max-width: none;
+}
+
+.maintenance-settings-grid {
+  display: grid;
+  gap: .75rem;
+}
+
+.maintenance-setting-row {
+  display: grid;
+  grid-template-columns: minmax(7rem, .7fr) minmax(9rem, 1fr) repeat(4, minmax(8rem, 1fr));
+  gap: .65rem;
+  align-items: end;
+  padding: .85rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--card-soft), transparent 24%);
+}
+
+.maintenance-active {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 2.9rem;
+}
+
+.maintenance-active input {
+  width: 1rem;
+  height: 1rem;
 }
 .data-actions-panel {
   margin-top: .9rem;
@@ -1021,6 +1064,7 @@ textarea { resize: vertical; }
   .live-results { position: static; }
   .maintenance-grid, .report-grid, .goals-grid, .history-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .fitness-goals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .maintenance-setting-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 820px) {
@@ -1084,7 +1128,7 @@ textarea { resize: vertical; }
   .theme-button { width: 100%; }
   .finance-hero { border-radius: 1.3rem; padding: 1.2rem; align-items: start; }
   .hero-copy h2 { font-size: clamp(2.5rem, 14vw, 4rem); white-space: normal; }
-  .primary-kpis, .secondary-kpis, .mini-goal-rings, .field-grid, .maintenance-grid, .report-grid, .goals-grid, .backup-grid, .settings-panel, .history-summary, .fitness-goals, .onboarding-grid { grid-template-columns: 1fr; }
+  .primary-kpis, .secondary-kpis, .mini-goal-rings, .field-grid, .maintenance-grid, .report-grid, .goals-grid, .backup-grid, .settings-panel, .history-summary, .fitness-goals, .onboarding-grid, .maintenance-setting-row { grid-template-columns: 1fr; }
   .mini-kpi { min-height: 4.25rem; }
   .split-title, .history-toolbar { align-items: stretch; flex-direction: column; }
   .history-toolbar input { width: 100%; }

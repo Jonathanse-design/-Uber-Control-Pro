@@ -1,7 +1,9 @@
 const starterEntries = Array.isArray(window.HISTORICAL_UBER_CONTROL_2026) ? window.HISTORICAL_UBER_CONTROL_2026 : [];
 
 const defaultSettings = {
-  reserveRate: 8,
+  reserveRate: 0,
+  reserveConfigured: false,
+  maintenanceFundResetKm: 0,
   depreciationRate: 4.5,
   dailyGoal: 3500,
   weeklyGoal: 22000,
@@ -20,6 +22,8 @@ const defaultSettings = {
 
 const demoSettings = {
   reserveRate: 8,
+  reserveConfigured: true,
+  maintenanceFundResetKm: 0,
   depreciationRate: 4.5,
   dailyGoal: 4200,
   weeklyGoal: 25200,
@@ -33,7 +37,14 @@ const demoSettings = {
     year: "2026",
     fuel: "Gasolina",
     currentKm: 42180
-  }
+  },
+  maintenanceItems: [
+    { name: "Aceite", lastKm: 38200, intervalKm: 8500, cost: 2500, date: "", active: true },
+    { name: "Filtro de aceite", lastKm: 38200, intervalKm: 8500, cost: 900, date: "", active: true },
+    { name: "Filtro de aire", lastKm: 36000, intervalKm: 10000, cost: 1800, date: "", active: true },
+    { name: "Frenos", lastKm: 30500, intervalKm: 18000, cost: 6500, date: "", active: true },
+    { name: "Neumáticos", lastKm: 24000, intervalKm: 35000, cost: 24000, date: "", active: true }
+  ]
 };
 
 let entries = initializeEntries();
@@ -68,14 +79,67 @@ function loadSettings() {
 }
 
 function normalizeSettings(value = {}) {
+  const migratedReserveRate = !hasValue(value.reserveConfigured) && Number(value.reserveRate) === 8 ? 0 : readNumber(value.reserveRate, defaultSettings.reserveRate);
+  const reserveConfigured = hasValue(value.reserveConfigured) ? Boolean(value.reserveConfigured) : migratedReserveRate > 0;
+  const vehicle = {
+    ...defaultSettings.vehicle,
+    ...(value.vehicle || {})
+  };
   return {
     ...defaultSettings,
     ...value,
-    vehicle: {
-      ...defaultSettings.vehicle,
-      ...(value.vehicle || {})
-    }
+    reserveRate: migratedReserveRate,
+    reserveConfigured,
+    maintenanceFundResetKm: readNumber(value.maintenanceFundResetKm),
+    vehicle,
+    maintenanceItems: normalizeMaintenanceItems(value.maintenanceItems, vehicle.type)
   };
+}
+
+function normalizeMaintenanceItems(items, vehicleType) {
+  const existing = Array.isArray(items) ? items : [];
+  const existingByName = new Map(existing.map(item => [cleanText(item.name), item]));
+  return defaultMaintenanceItems(vehicleType).map(defaultItem => normalizeMaintenanceItem({
+    ...defaultItem,
+    ...(existingByName.get(defaultItem.name) || {})
+  }));
+}
+
+function normalizeMaintenanceItem(item = {}) {
+  return {
+    name: cleanText(item.name),
+    lastKm: hasValue(item.lastKm) ? readNumber(item.lastKm) : "",
+    intervalKm: readNumber(item.intervalKm, item.interval, 0),
+    cost: readNumber(item.cost),
+    date: cleanText(item.date),
+    active: item.active !== false
+  };
+}
+
+function defaultMaintenanceItems(vehicleType) {
+  if (String(vehicleType || "").toLowerCase() === "motocicleta") {
+    return [
+      { name: "Aceite", lastKm: "", intervalKm: 3000, cost: 1200, date: "", active: true },
+      { name: "Filtro", lastKm: "", intervalKm: 6000, cost: 700, date: "", active: true },
+      { name: "Cadena", lastKm: "", intervalKm: 8000, cost: 2200, date: "", active: true },
+      { name: "Neumáticos", lastKm: "", intervalKm: 12000, cost: 6500, date: "", active: true },
+      { name: "Frenos", lastKm: "", intervalKm: 7000, cost: 1800, date: "", active: true },
+      { name: "Batería", lastKm: "", intervalKm: 18000, cost: 3200, date: "", active: true },
+      { name: "Suspensión", lastKm: "", intervalKm: 16000, cost: 4200, date: "", active: true }
+    ];
+  }
+  return [
+    { name: "Aceite", lastKm: "", intervalKm: 8500, cost: 2500, date: "", active: true },
+    { name: "Filtro de aceite", lastKm: "", intervalKm: 8500, cost: 900, date: "", active: true },
+    { name: "Filtro de aire", lastKm: "", intervalKm: 10000, cost: 1800, date: "", active: true },
+    { name: "Filtro de cabina", lastKm: "", intervalKm: 12000, cost: 1200, date: "", active: true },
+    { name: "Frenos", lastKm: "", intervalKm: 18000, cost: 6500, date: "", active: true },
+    { name: "Neumáticos", lastKm: "", intervalKm: 35000, cost: 24000, date: "", active: true },
+    { name: "Batería", lastKm: "", intervalKm: 30000, cost: 7800, date: "", active: true },
+    { name: "Transmisión", lastKm: "", intervalKm: 50000, cost: 9000, date: "", active: true },
+    { name: "Alineación", lastKm: "", intervalKm: 10000, cost: 1600, date: "", active: true },
+    { name: "Balanceo", lastKm: "", intervalKm: 10000, cost: 1400, date: "", active: true }
+  ];
 }
 
 function save() {
@@ -277,7 +341,7 @@ function enrich(entry) {
   const otrosGastos = Number(normalized.expenses || 0) + Number(entry.comida || 0) + Number(entry.peajes || 0);
   const gastos = combustible + otrosGastos;
   const distance = km(normalized);
-  const reserve = distance * Number(settings.reserveRate || 0);
+  const reserve = settings.reserveConfigured ? distance * Number(settings.reserveRate || 0) : 0;
   const depreciation = distance * Number(settings.depreciationRate || 0);
   const operating = hasValue(normalized.netProfit) ? Number(normalized.netProfit) : ingresos - gastos;
   const real = operating - reserve - depreciation;
@@ -350,7 +414,8 @@ function renderHero(total) {
     : "La operación necesita ajuste: el costo real del vehículo supera la utilidad.";
   const rows = [
     ["Ingresos", total.ingresos, "plus"],
-    ["Gastos operativos", -total.gastos, "minus"],
+    ["Gasto operativo", -total.gastos, "minus"],
+    ["Ganancia operativa", total.operating, total.operating >= 0 ? "plus" : "minus"],
     ["Reserva mantenimiento", -total.reserve, "minus"],
     ["Depreciación vehículo", -total.depreciation, "minus"]
   ];
@@ -608,15 +673,20 @@ function renderMaintenance(all) {
     .filter(value => value > 0);
   const configuredKm = Number(settings.vehicle?.currentKm || 0);
   const currentKm = configuredKm || (knownOdometers.length ? Math.max(...knownOdometers) : 0);
-  const items = maintenanceCatalog(settings.vehicle?.type).map(({ name, interval, cost }) => {
-    const progress = interval ? currentKm % interval : 0;
-    const remaining = interval ? Math.max(0, interval - progress) : 0;
-    return { name, interval, remaining, cost };
-  });
-  const health = items.length ? Math.round(items.reduce((sum, item) => sum + Math.min(100, (item.remaining / Math.max(item.interval, 1)) * 100), 0) / items.length) : 0;
-  const next = [...items].sort((a, b) => a.remaining - b.remaining)[0];
-  const futureCost = items.filter(item => item.remaining <= 3000).reduce((sum, item) => sum + item.cost, 0);
-  const critical = items.filter(item => item.remaining <= 500).length;
+  const items = (settings.maintenanceItems || [])
+    .map(normalizeMaintenanceItem)
+    .filter(item => item.active)
+    .map(item => {
+      const configured = hasValue(item.lastKm) && item.intervalKm > 0;
+      const nextKm = configured ? Number(item.lastKm) + Number(item.intervalKm) : null;
+      const remaining = configured ? nextKm - currentKm : null;
+      return { ...item, configured, nextKm, remaining };
+    });
+  const configuredItems = items.filter(item => item.configured);
+  const health = configuredItems.length ? Math.round(configuredItems.reduce((sum, item) => sum + Math.max(0, Math.min(100, (item.remaining / Math.max(item.intervalKm, 1)) * 100)), 0) / configuredItems.length) : 0;
+  const next = [...configuredItems].sort((a, b) => a.remaining - b.remaining)[0] || null;
+  const futureCost = configuredItems.filter(item => item.remaining <= 3000).reduce((sum, item) => sum + item.cost, 0);
+  const critical = configuredItems.filter(item => item.remaining <= 500).length;
   const risk = critical > 1 ? "Alto" : critical === 1 ? "Medio" : "Bajo";
   const riskClass = risk.toLowerCase();
   document.getElementById("vehicleHealth").textContent = `${health}%`;
@@ -624,15 +694,19 @@ function renderMaintenance(all) {
   document.getElementById("vehicleSystemSummary").innerHTML = `
     <div class="vehicle-summary-row"><span>Vehículo</span><strong>${escapeHtml(getVehicleSummary())}</strong></div>
     <div class="vehicle-summary-row"><span>Kilometraje actual</span><strong>${fmtNum.format(currentKm)} km</strong></div>
-    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${next.name}</strong></div>
+    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${next ? escapeHtml(next.name) : "No configurado"}</strong></div>
     <div class="vehicle-summary-row"><span>Riesgo mecánico</span><strong class="risk-${riskClass}">${risk}</strong></div>
     <div class="vehicle-summary-row"><span>Costos futuros</span><strong>${fmtMoney.format(futureCost)}</strong></div>
+    <p class="vehicle-note">El fondo de mantenimiento es una reserva estimada basada en los kilómetros registrados y la reserva por kilómetro definida por el usuario.</p>
+    <button class="ghost-button danger-action" id="resetMaintenanceFundVehicle" type="button">Reiniciar fondo de mantenimiento</button>
   `;
   document.getElementById("maintenanceGrid").innerHTML = items.map(item => `
-    <article class="panel maintenance-card ${item.remaining <= 500 ? "critical" : item.remaining <= 1800 ? "warning" : "ok"}">
-      <strong>${item.name}</strong>
-      <p>${fmtNum.format(item.remaining)} km restantes</p>
-      <div class="progress-bar" style="--value:${Math.max(6, Math.min(100, item.remaining / 30))}%"><span></span></div>
+    <article class="panel maintenance-card ${maintenanceStatusClass(item)}">
+      <strong>${escapeHtml(item.name)}</strong>
+      <p>${item.configured ? formatMaintenanceRemaining(item.remaining) : "No configurado"}</p>
+      <div class="progress-bar" style="--value:${item.configured ? Math.max(6, Math.min(100, (item.remaining / Math.max(item.intervalKm, 1)) * 100)) : 6}%"><span></span></div>
+      <div class="profit-row"><span>Último km</span><strong>${item.configured ? fmtNum.format(item.lastKm) : "No configurado"}</strong></div>
+      <div class="profit-row"><span>Próximo km</span><strong>${item.configured ? fmtNum.format(item.nextKm) : "No configurado"}</strong></div>
       <div class="profit-row"><span>Costo estimado</span><strong>${fmtMoney.format(item.cost)}</strong></div>
     </article>
   `).join("");
@@ -640,6 +714,8 @@ function renderMaintenance(all) {
 }
 
 function renderDashboardVehicle(vehicle, total) {
+  const allTotal = totals(entries.map(enrich));
+  const fund = maintenanceFund(allTotal);
   document.getElementById("dashboardVehicleSystem").innerHTML = `
     <div class="vehicle-score">
       <div class="fitness-ring vehicle-ring" style="--value:${vehicle.health}%"><span>${vehicle.health}%</span></div>
@@ -649,38 +725,41 @@ function renderDashboardVehicle(vehicle, total) {
         <p>Riesgo mecánico actual</p>
       </div>
     </div>
-    <div class="vehicle-summary-row"><span>Fondo mantenimiento</span><strong>${fmtMoney.format(total.reserve)}</strong></div>
+    <div class="vehicle-summary-row"><span>Reserva por KM configurada</span><strong>${fund.configured ? fmtMoney.format(fund.reserveRate) : "Reserva no configurada"}</strong></div>
+    <div class="vehicle-summary-row"><span>KM usados para el cálculo</span><strong>${fmtNum.format(fund.kmUsed)} km</strong></div>
+    <div class="vehicle-summary-row"><span>Fondo acumulado</span><strong>${fund.configured ? fmtMoney.format(fund.amount) : "Reserva no configurada"}</strong></div>
+    <div class="vehicle-summary-row"><span>Depreciación por KM</span><strong>${fmtMoney.format(Number(settings.depreciationRate || 0))}</strong></div>
+    <div class="vehicle-summary-row"><span>Depreciación acumulada</span><strong>${fmtMoney.format(allTotal.depreciation)}</strong></div>
     <div class="vehicle-summary-row"><span>Vehículo</span><strong>${escapeHtml(getVehicleSummary())}</strong></div>
-    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${vehicle.next.name}</strong></div>
-    <div class="vehicle-summary-row"><span>KM restantes</span><strong>${fmtNum.format(vehicle.next.remaining)} km</strong></div>
+    <div class="vehicle-summary-row"><span>Próximo mantenimiento</span><strong>${vehicle.next ? escapeHtml(vehicle.next.name) : "No configurado"}</strong></div>
+    <div class="vehicle-summary-row"><span>KM restantes</span><strong>${vehicle.next ? formatMaintenanceRemaining(vehicle.next.remaining) : "No configurado"}</strong></div>
     <div class="vehicle-summary-row"><span>Costos futuros estimados</span><strong>${fmtMoney.format(vehicle.futureCost)}</strong></div>
+    <p class="vehicle-note">El fondo de mantenimiento es una reserva estimada basada en los kilómetros registrados y la reserva por kilómetro definida por el usuario.</p>
+    <button class="ghost-button danger-action" id="resetMaintenanceFund" type="button">Reiniciar fondo de mantenimiento</button>
   `;
 }
 
-function maintenanceCatalog(type) {
-  if (String(type || "").toLowerCase() === "motocicleta") {
-    return [
-      { name: "Aceite", interval: 3000, cost: 1200 },
-      { name: "Filtro", interval: 6000, cost: 700 },
-      { name: "Cadena", interval: 8000, cost: 2200 },
-      { name: "Neumáticos", interval: 12000, cost: 6500 },
-      { name: "Frenos", interval: 7000, cost: 1800 },
-      { name: "Batería", interval: 18000, cost: 3200 },
-      { name: "Suspensión", interval: 16000, cost: 4200 }
-    ];
-  }
-  return [
-    { name: "Aceite", interval: 7000, cost: 2500 },
-    { name: "Filtro de aceite", interval: 7000, cost: 900 },
-    { name: "Filtro de aire", interval: 10000, cost: 1800 },
-    { name: "Filtro de cabina", interval: 12000, cost: 1200 },
-    { name: "Frenos", interval: 18000, cost: 6500 },
-    { name: "Neumáticos", interval: 35000, cost: 24000 },
-    { name: "Batería", interval: 30000, cost: 7800 },
-    { name: "Transmisión", interval: 50000, cost: 9000 },
-    { name: "Alineación", interval: 10000, cost: 1600 },
-    { name: "Balanceo", interval: 10000, cost: 1400 }
-  ];
+function maintenanceStatusClass(item) {
+  if (!item.configured) return "unconfigured";
+  if (item.remaining <= 500) return "critical";
+  if (item.remaining <= 1800) return "warning";
+  return "ok";
+}
+
+function formatMaintenanceRemaining(value) {
+  const kmValue = Number(value || 0);
+  return kmValue < 0 ? `Vencido por ${fmtNum.format(Math.abs(kmValue))} km` : `${fmtNum.format(kmValue)} km restantes`;
+}
+
+function maintenanceFund(allTotal) {
+  const configured = Boolean(settings.reserveConfigured) && Number(settings.reserveRate || 0) > 0;
+  const kmUsed = Math.max(0, Number(allTotal.km || 0) - Number(settings.maintenanceFundResetKm || 0));
+  return {
+    configured,
+    reserveRate: Number(settings.reserveRate || 0),
+    kmUsed,
+    amount: configured ? kmUsed * Number(settings.reserveRate || 0) : 0
+  };
 }
 
 function getVehicleSummary() {
@@ -760,6 +839,9 @@ function bindEvents() {
   });
   if (localStorage.getItem("ucp_theme") === "dark") document.body.classList.add("dark");
   document.getElementById("menuToggle").addEventListener("click", () => document.getElementById("sidebar").classList.toggle("open"));
+  document.addEventListener("click", event => {
+    if (event.target?.id === "resetMaintenanceFund" || event.target?.id === "resetMaintenanceFundVehicle") resetMaintenanceFund();
+  });
   document.getElementById("entryForm").addEventListener("input", event => renderLiveResults(new FormData(event.currentTarget)));
   document.getElementById("entryForm").addEventListener("submit", saveEntry);
   bindClick("topExport", () => exportCsv(entries));
@@ -770,6 +852,12 @@ function bindEvents() {
   document.getElementById("importFile").addEventListener("change", importFile);
   document.getElementById("saveSettings").addEventListener("click", saveSettings);
   bindClick("saveVehicleSettings", saveSettings);
+  bindClick("saveMaintenanceSettings", saveSettings);
+  document.getElementById("vehicleType").addEventListener("change", event => {
+    settings.vehicle.type = event.target.value;
+    settings.maintenanceItems = normalizeMaintenanceItems(settings.maintenanceItems, settings.vehicle.type);
+    renderMaintenanceSettings();
+  });
   document.getElementById("historySearch").addEventListener("input", renderHistory);
   document.getElementById("historyExport").addEventListener("click", () => exportCsv(entries));
   bindClick("loadDemoWelcome", () => loadDemoData({ skipConfirm: true }));
@@ -867,21 +955,26 @@ function hydrateSettings() {
   document.getElementById("vehicleYear").value = settings.vehicle.year;
   document.getElementById("vehicleFuel").value = settings.vehicle.fuel;
   document.getElementById("vehicleCurrentKm").value = settings.vehicle.currentKm || "";
+  renderMaintenanceSettings();
 }
 
 function saveSettings() {
+  const reserveRate = readNumber(document.getElementById("reserveRate").value);
   settings = {
     ...settings,
-    reserveRate: Number(document.getElementById("reserveRate").value),
+    reserveRate,
+    reserveConfigured: reserveRate > 0,
     depreciationRate: Number(document.getElementById("depreciationRate").value),
     dailyGoal: Number(document.getElementById("dailyGoalInput").value),
     monthlyGoal: Number(document.getElementById("monthlyGoalInput").value),
-    vehicle: readVehicleForm()
+    vehicle: readVehicleForm(),
+    maintenanceItems: readMaintenanceSettings()
   };
   settings.weeklyGoal = settings.dailyGoal * 6;
   settings.annualGoal = settings.monthlyGoal * 12;
   save();
   renderAll();
+  renderMaintenanceSettings();
 }
 
 function readVehicleForm() {
@@ -893,6 +986,42 @@ function readVehicleForm() {
     fuel: cleanText(document.getElementById("vehicleFuel").value) || defaultSettings.vehicle.fuel,
     currentKm: readNumber(document.getElementById("vehicleCurrentKm").value)
   };
+}
+
+function renderMaintenanceSettings() {
+  const grid = document.getElementById("maintenanceSettingsGrid");
+  if (!grid) return;
+  settings = normalizeSettings(settings);
+  grid.innerHTML = settings.maintenanceItems.map((item, index) => `
+    <article class="maintenance-setting-row">
+      <label class="maintenance-active"><input type="checkbox" data-maintenance-field="active" data-index="${index}" ${item.active ? "checked" : ""}> Activo</label>
+      <label>Nombre<input data-maintenance-field="name" data-index="${index}" value="${escapeHtml(item.name)}"></label>
+      <label>Último mantenimiento en km<input data-maintenance-field="lastKm" data-index="${index}" type="number" min="0" step="1" value="${hasValue(item.lastKm) ? item.lastKm : ""}" placeholder="No configurado"></label>
+      <label>Intervalo en km<input data-maintenance-field="intervalKm" data-index="${index}" type="number" min="0" step="1" value="${item.intervalKm}"></label>
+      <label>Costo estimado<input data-maintenance-field="cost" data-index="${index}" type="number" min="0" step="100" value="${item.cost}"></label>
+      <label>Fecha opcional<input data-maintenance-field="date" data-index="${index}" type="date" value="${escapeHtml(item.date)}"></label>
+    </article>
+  `).join("");
+}
+
+function readMaintenanceSettings() {
+  const grouped = new Map();
+  document.querySelectorAll("[data-maintenance-field]").forEach(input => {
+    const index = Number(input.dataset.index);
+    const field = input.dataset.maintenanceField;
+    const current = grouped.get(index) || {};
+    current[field] = input.type === "checkbox" ? input.checked : input.value;
+    grouped.set(index, current);
+  });
+  return [...grouped.values()].map(normalizeMaintenanceItem);
+}
+
+function resetMaintenanceFund() {
+  if (!window.confirm("¿Reiniciar el fondo de mantenimiento?\n\nUsa esta opción solo cuando hayas usado ese dinero para una reparación. Esta acción no borra tus registros.")) return;
+  const allTotal = totals(entries.map(enrich));
+  settings.maintenanceFundResetKm = Number(allTotal.km || 0);
+  save();
+  renderAll();
 }
 
 function readSetupSettings() {
